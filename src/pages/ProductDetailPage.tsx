@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Edit2, Trash2, Code, Cpu, Globe, ExternalLink, Store, User,
   FlaskConical, Upload, FileText, MessageSquare, Send, X, History, Plus, Download,
-  Gauge, Award, Grid2x2, Gavel, Check,
+  Gauge, Award, Grid2x2, Gavel,
 } from "lucide-react";
 import {
   getProduct, updateProduct, deleteProduct,
@@ -23,7 +23,6 @@ import {
   computeScore, getScoreColors, getCompatibilityColors, getCompatibilityLabel,
   formatTimeAgo, formatDate,
 } from "@/lib/utils";
-import { ScoreEditor, CompatibilityEditor } from "./NewProductPage";
 
 const TABS = ["Overview", "Technical", "Compatibility", "Commercial", "Evaluation", "Development"] as const;
 type Tab = typeof TABS[number];
@@ -588,8 +587,8 @@ function EditProductModal({ product, performedBy, onClose, onSaved }: {
 }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [saving, setSaving] = useState(false);
-  const [scores, setScores] = useState<EvaluationScore[]>(product.scores || []);
-  const [matrix, setMatrix] = useState<CompatibilityEntry[]>(product.compatibilityMatrix || []);
+  const [scores] = useState<EvaluationScore[]>(product.scores || []);
+  const [matrix] = useState<CompatibilityEntry[]>(product.compatibilityMatrix || []);
   const [form, setForm] = useState({
     name: product.name, category: product.category || "", version: product.version || "", website: product.website || "",
     maturityLevel: product.maturityLevel || "L1",

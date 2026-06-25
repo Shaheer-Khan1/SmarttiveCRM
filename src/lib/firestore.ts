@@ -1,7 +1,7 @@
 import {
   collection, doc, getDocs, getDoc, getDocFromServer, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, Timestamp, serverTimestamp, writeBatch,
-  limit, setDoc,
+  limit, setDoc, type QueryConstraint,
 } from "firebase/firestore";
 import { db, storage, auth } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
@@ -179,7 +179,7 @@ export async function deleteCustomer(id: string) {
 // ─── Opportunities ────────────────────────────────────────────────────────────
 
 export async function getOpportunities(filters?: { status?: string; customerId?: string }): Promise<Opportunity[]> {
-  const constraints = [orderBy("updatedAt", "desc")];
+  const constraints: QueryConstraint[] = [orderBy("updatedAt", "desc")];
   if (filters?.status && filters.status !== "ALL") constraints.unshift(where("status", "==", filters.status));
   if (filters?.customerId) constraints.unshift(where("customerId", "==", filters.customerId));
   const snap = await getDocs(query(collection(db, "opportunities"), ...constraints));

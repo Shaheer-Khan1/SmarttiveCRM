@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  createUserWithEmailAndPassword, deleteUser as deleteFirebaseUser,
-  signInWithEmailAndPassword, signOut as fbSignOut,
+  createUserWithEmailAndPassword, signOut as fbSignOut,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -14,7 +13,6 @@ import { seedDemoData, deleteDemoData, type DemoDeletionResult } from "@/lib/fir
 export default function AdminUsersPage() {
   const { isAdmin, user, profile } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
   const [seeding, setSeeding] = useState(false);
@@ -22,7 +20,7 @@ export default function AdminUsersPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState<DemoDeletionResult | null>(null);
 
-  const load = () => getUsers().then(setUsers).finally(() => setLoading(false));
+  const load = () => { void getUsers().then(setUsers); };
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
@@ -145,22 +143,17 @@ export default function AdminUsersPage() {
           user={editUser}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); }}
-          currentUserUid={user?.uid || ""}
-          currentUserPassword=""
         />
       )}
     </div>
   );
 }
 
-function UserModal({ user, onClose, onSaved, currentUserUid, currentUserPassword }: {
+function UserModal({ user, onClose, onSaved }: {
   user: UserProfile | null;
   onClose: () => void;
   onSaved: () => void;
-  currentUserUid: string;
-  currentUserPassword: string;
 }) {
-  const { user: currentAuthUser } = useAuth();
   const [form, setForm] = useState({ name: user?.name || "", email: user?.email || "", password: "", role: user?.role || "MANAGER" as "ADMIN" | "MANAGER" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -178,9 +171,6 @@ function UserModal({ user, onClose, onSaved, currentUserUid, currentUserPassword
         // Create new user using Firebase Auth
         // We need a secondary auth instance or admin SDK.
         // For now we create the user and immediately restore session.
-        const savedEmail = currentAuthUser?.email || "";
-        const savedPwd = ""; // we can't get this
-
         const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
         await setDoc(doc(db, "users", cred.user.uid), {
           name: form.name,

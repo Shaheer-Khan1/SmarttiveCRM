@@ -4,7 +4,7 @@ import {
 } from "date-fns";
 import { Clock, Target, Package, ChevronRight } from "lucide-react";
 import type { CalendarEvent, Opportunity, Product } from "@/lib/firestore";
-import { expandRecurrence, getMaturityIndex, getMaturityLabel, getStatusLabel, getProductStatusLabel } from "@/lib/utils";
+import { expandRecurrence, getMaturityIndex, getMaturityLabel, getStatusLabel } from "@/lib/utils";
 
 export type GanttKind = "event" | "opportunity" | "product";
 

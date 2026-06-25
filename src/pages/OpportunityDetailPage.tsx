@@ -16,7 +16,7 @@ import ActivityCalendar from "@/components/ActivityCalendar";
 import StatusBadge from "@/components/StatusBadge";
 import FollowUpBadge from "@/components/FollowUpBadge";
 import { getFollowUpStatus, formatDate, formatTimeAgo, ACTIVITY_TYPES, CURRENCIES } from "@/lib/utils";
-import { getUsers, type UserProfile, type AssignedPerson } from "@/lib/firestore";
+import { getUsers, type UserProfile } from "@/lib/firestore";
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -416,7 +416,7 @@ function EditOpportunityModal({ opp, onClose, onSaved }: { opp: Opportunity; onC
           {[{ key: "title", label: "Title", required: true }, { key: "solution", label: "Solution" }, { key: "nextStep", label: "Next Step" }].map(({ key, label, required }) => (
             <div key={key}>
               <label className="text-xs font-medium text-gray-700 mb-1.5 block">{label}{required && " *"}</label>
-              <input required={required} value={(form as Record<string, string>)[key]}
+              <input required={required} value={form[key as "title" | "solution" | "nextStep"]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
