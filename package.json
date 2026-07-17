@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bootstrap:accounts": "node scripts/bootstrap-accounts.mjs",
+    "scrub:tags": "node scripts/scrub-person-tags.mjs",
+    "test:e2e-roles": "node scripts/e2e-roles.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",

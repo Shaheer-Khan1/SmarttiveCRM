@@ -67,7 +67,7 @@ service firebase.storage {
 
 ## Step 4: Configure Environment Variables
 
-Edit the `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in Firebase values:
 
 ```env
 VITE_FIREBASE_API_KEY=AIza...
@@ -80,23 +80,25 @@ VITE_FIREBASE_APP_ID=1:123456789:web:abc123
 
 ---
 
-## Step 5: Create the First Admin User
+## Step 5: Create Role Accounts
 
-Since this is a closed internal system, create the first user manually:
+Create one Auth user + Firestore profile per role:
 
-1. In Firebase Console → **Authentication** → **Users** → **Add user**
-2. Enter email and password (e.g. `chand@smarttive.com` / your password)
-3. Copy the **User UID** shown
+```bash
+npm run bootstrap:accounts
+```
 
-4. In Firebase Console → **Firestore** → **Start collection** → `users`
-5. Add a document with the copied UID as the document ID:
-```json
-{
-  "name": "Chand",
-  "email": "chand@smarttive.com",
-  "role": "ADMIN",
-  "createdAt": (use timestamp field)
-}
+Default test accounts (override with `BOOTSTRAP_*` env vars if needed):
+
+| Role | Email | Password |
+|------|-------|----------|
+| ADMIN | `admin@smarttive.com` | `SmarttiveAdmin2026!` |
+| MANAGER | `manager@smarttive.com` | `SmarttiveManager2026!` |
+
+Verify roles against Firebase:
+
+```bash
+npm run test:e2e-roles
 ```
 
 ---
@@ -108,7 +110,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) and sign in.
+Open [http://localhost:5173](http://localhost:5173) and sign in with a role account.
 
 ---
 
@@ -116,25 +118,17 @@ Open [http://localhost:5173](http://localhost:5173) and sign in.
 
 After signing in as Admin:
 1. Go to **Admin → Users**
-2. Click **"Load Demo Data"** to seed customers, opportunities, and activities
+2. Click **"Load Demo Data"** to seed customers, opportunities, activities, calendar, and product research data
+
+Demo opportunity tags are categories (Security, Parking, etc.), not people names. Assignees come from real user accounts.
 
 ---
 
 ## Adding More Users
 
-1. Go to Firebase Console → **Authentication** → **Add user** (create email/password)
-2. Copy the UID
-3. Go to **Firestore → users** collection → Add document with that UID:
-```json
-{
-  "name": "Mitesh",
-  "email": "mitesh@smarttive.com",
-  "role": "MANAGER",
-  "createdAt": (timestamp)
-}
-```
+Use **Admin → Users → Add User** in the app. Creation uses a secondary Auth instance so the admin session stays signed in.
 
-Or use the **Admin → Users → Add User** button in the app (note: this signs you out temporarily).
+Or create Auth users in Firebase Console and add a matching `users/{uid}` document with `name`, `email`, `role`, and `createdAt`.
 
 ---
 
@@ -142,21 +136,14 @@ Or use the **Admin → Users → Add User** button in the app (note: this signs 
 
 | Feature | Admin | Manager |
 |---------|-------|---------|
-| View dashboard | ✅ | ✅ |
-| Search | ✅ | ✅ |
+| View dashboard / search | ✅ | ✅ |
 | View customers & opportunities | ✅ | ✅ |
-| Add/edit/delete records | ✅ | ❌ |
-| Add activities | ✅ | ❌ |
-| Upload files | ✅ | ❌ |
-| Manage users | ✅ | ❌ |
+| Create opportunities | ✅ | ✅ |
+| Add/edit/delete customers | ✅ | ❌ |
+| Change opportunity status / delete deals | ✅ | ❌ |
+| Log activities on assigned deals | ✅ | ✅ |
+| Admin comments on opportunities | ✅ | ❌ |
+| Manage users / seed demo data | ✅ | ❌ |
+| Product research admin actions | ✅ | Limited |
 
----
-
-## Follow-up Status Rules
-
-| Status | Condition |
-|--------|-----------|
-| 🟢 Healthy | Last activity within 5 days |
-| 🟡 Warning | No activity for 5–6 days |
-| 🔴 Red Flag | No activity for 7+ days |
-| ⚫ No Activity | Never had any activity |
+Users without a Firestore profile are **not** treated as admins.

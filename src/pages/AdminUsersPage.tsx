@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import {
-  createUserWithEmailAndPassword, signOut as fbSignOut,
-} from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { getUsers, updateUserProfile, deleteUserProfile, type UserProfile } from "@/lib/firestore";
+import { db, createSecondaryAuth, disposeSecondaryApp } from "@/lib/firebase";
+import { getUsers, updateUserProfile, deleteUserProfile, seedDemoData, deleteDemoData, type UserProfile, type DemoDeletionResult } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { Plus, Trash2, Edit2, Shield, Eye } from "lucide-react";
-import { seedDemoData, deleteDemoData, type DemoDeletionResult } from "@/lib/firestore";
 
 export default function AdminUsersPage() {
   const { isAdmin, user, profile } = useAuth();
@@ -168,23 +165,19 @@ function UserModal({ user, onClose, onSaved }: {
         // Update existing
         await updateUserProfile(user.id, { name: form.name, role: form.role });
       } else {
-        // Create new user using Firebase Auth
-        // We need a secondary auth instance or admin SDK.
-        // For now we create the user and immediately restore session.
-        const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          name: form.name,
-          email: form.email,
-          role: form.role,
-          createdAt: serverTimestamp(),
-        });
-
-        // Sign out new user and sign back in as original admin
-        await fbSignOut(auth);
-        // Note: Admin needs to re-login. Show a message.
-        alert(`User ${form.name} created. You have been signed out. Please sign back in.`);
-        window.location.href = "/login";
-        return;
+        // Secondary Auth app keeps the current admin session intact
+        const { app: secondaryApp, auth: secondaryAuth } = createSecondaryAuth();
+        try {
+          const cred = await createUserWithEmailAndPassword(secondaryAuth, form.email, form.password);
+          await setDoc(doc(db, "users", cred.user.uid), {
+            name: form.name,
+            email: form.email,
+            role: form.role,
+            createdAt: serverTimestamp(),
+          });
+        } finally {
+          await disposeSecondaryApp(secondaryApp);
+        }
       }
       onSaved();
     } catch (err: unknown) {
@@ -200,7 +193,7 @@ function UserModal({ user, onClose, onSaved }: {
         <div className="px-6 py-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold">{user ? "Edit User" : "Add User"}</h2>
           {!user && (
-            <p className="text-xs text-amber-600 mt-1">Note: Creating a user will sign you out temporarily.</p>
+            <p className="text-xs text-gray-500 mt-1">Creates an Auth account and a Firestore profile with the selected role.</p>
           )}
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">

@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signIn,
         signOut,
-        isAdmin: !profile || profile.role === "ADMIN",
+        isAdmin: profile?.role === "ADMIN",
         refreshProfile,
       }}
     >

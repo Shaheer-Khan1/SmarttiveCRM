@@ -101,7 +101,7 @@ export default function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-white text-sm font-medium truncate">{profile?.name || "User"}</p>
-            <p className="text-slate-400 text-xs">{profile?.role || "ADMIN"}</p>
+            <p className="text-slate-400 text-xs">{profile?.role || "—"}</p>
           </div>
         </div>
         <button onClick={handleSignOut}

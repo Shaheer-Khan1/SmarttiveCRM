@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Target, X } from "lucide-react";
-import { getOpportunities, type Opportunity } from "@/lib/firestore";
+import { getOpportunities, getUsers, type Opportunity, type UserProfile } from "@/lib/firestore";
 import OpportunityCard from "@/components/OpportunityCard";
-import { getFollowUpStatus, TEAM_MEMBERS } from "@/lib/utils";
+import { getFollowUpStatus, OPPORTUNITY_TAGS } from "@/lib/utils";
 
 export default function OpportunitiesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [opps, setOpps] = useState<Opportunity[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [followUpFilter, setFollowUpFilter] = useState(searchParams.get("followUp") || "");
   const [tagFilter, setTagFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -21,6 +23,14 @@ export default function OpportunitiesPage() {
   };
 
   useEffect(() => { load(); }, [statusFilter]);
+  useEffect(() => { getUsers().then(setUsers); }, []);
+
+  const tagOptions = useMemo(() => {
+    const fromData = new Set<string>();
+    for (const opp of opps) for (const t of opp.tags) if (t.trim()) fromData.add(t);
+    for (const t of OPPORTUNITY_TAGS) fromData.add(t);
+    return Array.from(fromData).sort((a, b) => a.localeCompare(b));
+  }, [opps]);
 
   const filtered = opps.filter((opp) => {
     if (followUpFilter) {
@@ -30,6 +40,7 @@ export default function OpportunitiesPage() {
       if (followUpFilter === "HEALTHY" && s !== "HEALTHY") return false;
     }
     if (tagFilter && !opp.tags.includes(tagFilter)) return false;
+    if (assigneeFilter && !opp.assignedTo.some((a) => a.id === assigneeFilter)) return false;
     return true;
   });
 
@@ -48,7 +59,6 @@ export default function OpportunitiesPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 bg-white border border-gray-200 rounded-xl p-3">
-        {/* Status */}
         <div className="flex gap-1 flex-wrap">
           {["ACTIVE", "WON", "LOST", "ON_HOLD", "ALL"].map((s) => (
             <button key={s} onClick={() => setStatusFilter(s)}
@@ -60,7 +70,6 @@ export default function OpportunitiesPage() {
 
         <div className="h-6 w-px bg-gray-200 self-center" />
 
-        {/* Follow-up */}
         <div className="flex gap-1">
           {[{ v: "", l: "All" }, { v: "RED_FLAG", l: "🔴 Red Flag" }, { v: "WARNING", l: "🟡 Warning" }, { v: "HEALTHY", l: "🟢 Healthy" }].map(({ v, l }) => (
             <button key={v} onClick={() => setFollowUpFilter(v)}
@@ -72,18 +81,33 @@ export default function OpportunitiesPage() {
 
         <div className="h-6 w-px bg-gray-200 self-center" />
 
-        {/* Team */}
-        <div className="flex gap-1 flex-wrap">
-          {TEAM_MEMBERS.map((m) => (
-            <button key={m} onClick={() => setTagFilter(tagFilter === m ? "" : m)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${tagFilter === m ? "bg-slate-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-              {m}
+        <div className="flex gap-1 flex-wrap items-center">
+          <span className="text-[11px] text-gray-400 font-medium px-1">Assignee</span>
+          {users.map((u) => (
+            <button key={u.id} onClick={() => setAssigneeFilter(assigneeFilter === u.id ? "" : u.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${assigneeFilter === u.id ? "bg-slate-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {u.name}
             </button>
           ))}
         </div>
 
-        {(followUpFilter || tagFilter) && (
-          <button onClick={() => { setFollowUpFilter(""); setTagFilter(""); setSearchParams({}); }}
+        {tagOptions.length > 0 && (
+          <>
+            <div className="h-6 w-px bg-gray-200 self-center" />
+            <div className="flex gap-1 flex-wrap items-center">
+              <span className="text-[11px] text-gray-400 font-medium px-1">Tag</span>
+              {tagOptions.map((t) => (
+                <button key={t} onClick={() => setTagFilter(tagFilter === t ? "" : t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${tagFilter === t ? "bg-slate-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {(followUpFilter || tagFilter || assigneeFilter) && (
+          <button onClick={() => { setFollowUpFilter(""); setTagFilter(""); setAssigneeFilter(""); setSearchParams({}); }}
             className="flex items-center gap-1 px-2 py-1.5 text-xs text-red-500 hover:text-red-700">
             <X className="w-3.5 h-3.5" /> Clear
           </button>
@@ -100,8 +124,10 @@ export default function OpportunitiesPage() {
           <p>No opportunities found</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((opp) => <OpportunityCard key={opp.id} opp={opp} />)}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((opp) => (
+            <OpportunityCard key={opp.id} opp={opp} />
+          ))}
         </div>
       )}
     </div>

@@ -121,7 +121,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
       id: snap.id,
       name: data.name ?? "",
       email: data.email ?? "",
-      role: (data.role as "ADMIN" | "MANAGER") ?? "ADMIN",
+      role: (data.role as "ADMIN" | "MANAGER") ?? "MANAGER",
       createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
     };
   } catch (err) {
@@ -1119,19 +1119,24 @@ export async function seedDemoData(adminUid: string, adminName: string) {
   // Opportunities
   const psimRef = doc(collection(db, "opportunities"));
   const adminPerson = { id: adminUid, name: adminName };
-  await setDoc(psimRef, { title: "PSIM + OrcaTwin Platform", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "PSIM, OrcaTwin Digital Twin", assignedTo: [adminPerson], nextStep: "Submit technical proposal after completing PoC demo", tags: ["Chand", "Mitesh"], notes: "KFUPM campus security integration project. High priority.", value: 850000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(2)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  // Prefer assigning some deals to a manager account when one exists
+  const allUsers = await getUsers();
+  const manager = allUsers.find((u) => u.role === "MANAGER" && u.id !== adminUid);
+  const managerPerson = manager ? { id: manager.id, name: manager.name } : null;
+
+  await setDoc(psimRef, { title: "PSIM + OrcaTwin Platform", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "PSIM, OrcaTwin Digital Twin", assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson], nextStep: "Submit technical proposal after completing PoC demo", tags: ["Security", "Enterprise"], notes: "KFUPM campus security integration project. High priority.", value: 850000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(2)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
   const parkingRef = doc(collection(db, "opportunities"));
-  await setDoc(parkingRef, { title: "Smart Parking System", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "Smart Parking Management", assignedTo: [adminPerson], nextStep: "Follow up with facilities team on site survey date", tags: ["Abu Saud"], value: 320000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(6)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(parkingRef, { title: "Smart Parking System", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "Smart Parking Management", assignedTo: managerPerson ? [managerPerson] : [adminPerson], nextStep: "Follow up with facilities team on site survey date", tags: ["Parking"], value: 320000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(6)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
   const videoRef = doc(collection(db, "opportunities"));
-  await setDoc(videoRef, { title: "Video Compression Solution", customerId: kfupmRef.id, customerName: "KFUPM", status: "ON_HOLD", holdReason: "Budget freeze until Q3 2026 – customer to revisit after internal review", solution: "Video Compression", assignedTo: [adminPerson], tags: ["Chand"], value: 175000, currency: "SAR", lastActivityDate: null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(videoRef, { title: "Video Compression Solution", customerId: kfupmRef.id, customerName: "KFUPM", status: "ON_HOLD", holdReason: "Budget freeze until Q3 2026 – customer to revisit after internal review", solution: "Video Compression", assignedTo: [adminPerson], tags: ["Video Analytics"], value: 175000, currency: "SAR", lastActivityDate: null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
   const aramcoOppRef = doc(collection(db, "opportunities"));
-  await setDoc(aramcoOppRef, { title: "Perimeter Surveillance & Analytics", customerId: aramcoRef.id, customerName: "Saudi Aramco", status: "ACTIVE", solution: "AI Video Analytics, Perimeter Security", assignedTo: [adminPerson], nextStep: "Prepare ROI report requested by security director", tags: ["Mitesh", "Chand"], value: 2400000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(9)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(aramcoOppRef, { title: "Perimeter Surveillance & Analytics", customerId: aramcoRef.id, customerName: "Saudi Aramco", status: "ACTIVE", solution: "AI Video Analytics, Perimeter Security", assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson], nextStep: "Prepare ROI report requested by security director", tags: ["Security", "Video Analytics"], value: 2400000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(9)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
   const mocOppRef = doc(collection(db, "opportunities"));
-  await setDoc(mocOppRef, { title: "Network Monitoring Platform", customerId: mocRef.id, customerName: "Ministry of Communications", status: "WON", solution: "NOC Platform, Network Analytics", assignedTo: [adminPerson], tags: ["Chand", "Abu Saud"], value: 680000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(15)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(mocOppRef, { title: "Network Monitoring Platform", customerId: mocRef.id, customerName: "Ministry of Communications", status: "WON", solution: "NOC Platform, Network Analytics", assignedTo: [adminPerson], tags: ["Networking", "Enterprise"], value: 680000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(15)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
   // Activities
   const activities = [

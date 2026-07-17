@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, deleteApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -16,3 +16,13 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+/** Secondary Auth instance so creating users does not sign out the current admin. */
+export function createSecondaryAuth(): { app: FirebaseApp; auth: Auth } {
+  const secondary = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+  return { app: secondary, auth: getAuth(secondary) };
+}
+
+export async function disposeSecondaryApp(secondaryApp: FirebaseApp) {
+  await deleteApp(secondaryApp);
+}

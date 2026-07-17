@@ -101,7 +101,14 @@ export const ACTIVITY_TYPES = [
   "DEMO", "POC", "SITE_VISIT", "FOLLOW_UP", "OTHER",
 ] as const;
 
-export const TEAM_MEMBERS = ["Chand", "Mitesh", "Abu Saud", "Management", "Technical Team"];
+/** Category tags used in demo seed data (not people names). */
+export const OPPORTUNITY_TAGS = [
+  "Security",
+  "Parking",
+  "Video Analytics",
+  "Networking",
+  "Enterprise",
+] as const;
 
 export const CURRENCIES = ["SAR", "USD", "AED", "EUR", "GBP"];
 
