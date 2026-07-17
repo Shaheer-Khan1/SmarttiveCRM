@@ -114,6 +114,26 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with a role acco
 
 ---
 
+## Deploy on Render
+
+This is a Vite SPA. The browser must load files from **`dist/`**, not the repo root. Serving source (`/src/main.tsx`) causes:
+
+`Expected a JavaScript module script but … MIME type of "binary/octet-stream"`.
+
+### Option A — Static Site (recommended)
+1. New → **Static Site**
+2. Build Command: `npm install && npm run build`
+3. Publish Directory: **`dist`** (not `.` or empty)
+4. Add SPA rewrite: Source `/*` → Destination `/index.html`
+5. Set all `VITE_FIREBASE_*` env vars, then redeploy
+
+### Option B — Web Service
+1. Build Command: `npm install && npm run build`
+2. Start Command: **`npm start`** (serves `dist/` with correct JS MIME types on `$PORT`)
+3. Set all `VITE_FIREBASE_*` env vars, then redeploy
+
+---
+
 ## Step 7: Load Demo Data
 
 After signing in as Admin:
