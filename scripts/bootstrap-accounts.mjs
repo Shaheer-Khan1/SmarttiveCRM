@@ -54,6 +54,12 @@ const ACCOUNTS = [
     name: "Sales Manager",
     role: "MANAGER",
   },
+  {
+    email: env.BOOTSTRAP_DEVELOPER_EMAIL || "developer@smarttive.com",
+    password: env.BOOTSTRAP_DEVELOPER_PASSWORD || "SmarttiveDev2026!",
+    name: "Assigned Developer",
+    role: "DEVELOPER",
+  },
 ];
 
 async function ensureAccount(account) {

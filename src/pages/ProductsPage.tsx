@@ -7,9 +7,13 @@ import { getProducts, getVendors, type Product, type Vendor, type ProductStatus,
 import {
   PRODUCT_STATUSES, getProductStatusLabel, getProductStatusColors, getPriorityColors,
 } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { canCreateCrmRecords } from "@/lib/permissions";
 
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const canCreate = canCreateCrmRecords(profile);
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +69,7 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Product Research</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Research</h1>
           <p className="text-gray-500 text-sm mt-1">
             {products.length} products · {stats.software} software · {stats.hardware} hardware
           </p>
@@ -74,9 +78,11 @@ export default function ProductsPage() {
           <Link to="/products/vendors" className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
             <Store className="w-4 h-4" /> Vendors
           </Link>
-          <Link to="/products/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-            <Plus className="w-4 h-4" /> Add Product
-          </Link>
+          {canCreate && (
+            <Link to="/products/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+              <Plus className="w-4 h-4" /> Add Product
+            </Link>
+          )}
         </div>
       </div>
 

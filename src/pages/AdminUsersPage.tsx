@@ -1,11 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, createSecondaryAuth, disposeSecondaryApp } from "@/lib/firebase";
-import { getUsers, updateUserProfile, deleteUserProfile, seedDemoData, deleteDemoData, type UserProfile, type DemoDeletionResult } from "@/lib/firestore";
+import {
+  getUsers, updateUserProfile, deleteUserProfile, seedDemoData, deleteDemoData,
+  type UserProfile, type UserRole, type DemoDeletionResult,
+} from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Trash2, Edit2, Shield, Eye } from "lucide-react";
+import { Plus, Trash2, Edit2, Shield, Eye, UserX, Code } from "lucide-react";
+
+const ROLE_STYLES: Record<UserRole, { badge: string; icon: typeof Shield }> = {
+  ADMIN: { badge: "bg-purple-50 text-purple-700 border-purple-200", icon: Shield },
+  MANAGER: { badge: "bg-gray-50 text-gray-600 border-gray-200", icon: Eye },
+  DEVELOPER: { badge: "bg-teal-50 text-teal-700 border-teal-200", icon: Code },
+};
 
 export default function AdminUsersPage() {
   const { isAdmin, user, profile } = useAuth();
@@ -20,12 +29,28 @@ export default function AdminUsersPage() {
   const load = () => { void getUsers().then(setUsers); };
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
 
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const aPending = a.role ? 1 : 0;
+      const bPending = b.role ? 1 : 0;
+      if (aPending !== bPending) return aPending - bPending;
+      return a.name.localeCompare(b.name);
+    });
+  }, [users]);
+
+  const pendingCount = users.filter((u) => !u.role).length;
+
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const handleDelete = async (u: UserProfile) => {
     if (u.id === user?.uid) return alert("Cannot delete your own account.");
     if (!confirm(`Delete user ${u.name}?`)) return;
     await deleteUserProfile(u.id);
+    load();
+  };
+
+  const assignRole = async (u: UserProfile, role: UserRole) => {
+    await updateUserProfile(u.id, { role });
     load();
   };
 
@@ -39,7 +64,7 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteDemo = async () => {
-    if (!confirm("This will permanently delete all demo data (KFUPM, Saudi Aramco, Ministry of Communications and their opportunities & activities). Continue?")) return;
+    if (!confirm("This will permanently delete all demo data. Continue?")) return;
     setDeleting(true);
     try {
       const result = await deleteDemoData();
@@ -52,12 +77,17 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-500 text-sm mt-1">{users.length} users</p>
+          <h1 className="page-title">User Management</h1>
+          <p className="page-subtitle">
+            {users.length} users
+            {pendingCount > 0 && (
+              <span className="ml-2 text-amber-600 font-medium">· {pendingCount} awaiting role</span>
+            )}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap w-full sm:w-auto">
           {!seeded && (
             <button onClick={handleSeed} disabled={seeding}
               className="px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50">
@@ -75,20 +105,25 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {pendingCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+          Google sign-ups appear here with no role. Assign Admin or Manager so they can access the CRM.
+        </div>
+      )}
+
       {seeded && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
-          Demo data loaded — customers, opportunities, activities, calendar events, vendors and products. Refresh to see it.
+          Demo data loaded. Refresh related pages to see it.
         </div>
       )}
       {deleteResult && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
           Demo data deleted: {deleteResult.customers} customers, {deleteResult.opportunities} opportunities,{" "}
-          {deleteResult.activities} activities, {deleteResult.products} products, {deleteResult.vendors} vendors,{" "}
-          {deleteResult.events} calendar events removed.
+          {deleteResult.activities} activities removed.
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="table-wrap">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
@@ -99,23 +134,41 @@ export default function AdminUsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
+            {sortedUsers.map((u) => (
+              <tr key={u.id} className={`hover:bg-gray-50 ${!u.role ? "bg-amber-50/40" : ""}`}>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
-                      {u.name.charAt(0)}
-                    </div>
+                    {u.photoURL ? (
+                      <img src={u.photoURL} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
+                        {(u.name || "?").charAt(0)}
+                      </div>
+                    )}
                     <span className="font-medium text-gray-900">{u.name}</span>
                     {u.id === user?.uid && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">You</span>}
                   </div>
                 </td>
                 <td className="px-5 py-4 text-sm text-gray-600">{u.email}</td>
                 <td className="px-5 py-4">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${u.role === "ADMIN" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                    {u.role === "ADMIN" ? <Shield className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    {u.role}
-                  </span>
+                  {!u.role ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                        <UserX className="w-3 h-3" /> Unassigned
+                      </span>
+                      <button type="button" onClick={() => assignRole(u, "DEVELOPER")}
+                        className="text-xs px-2 py-1 rounded-lg bg-teal-600 text-white hover:bg-teal-700">Developer</button>
+                      <button type="button" onClick={() => assignRole(u, "MANAGER")}
+                        className="text-xs px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Manager</button>
+                      <button type="button" onClick={() => assignRole(u, "ADMIN")}
+                        className="text-xs px-2 py-1 rounded-lg bg-purple-600 text-white hover:bg-purple-700">Admin</button>
+                    </div>
+                  ) : (
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${ROLE_STYLES[u.role].badge}`}>
+                      {(() => { const Icon = ROLE_STYLES[u.role].icon; return <Icon className="w-3 h-3" />; })()}
+                      {u.role}
+                    </span>
+                  )}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-2 justify-end">
@@ -151,7 +204,12 @@ function UserModal({ user, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState({ name: user?.name || "", email: user?.email || "", password: "", role: user?.role || "MANAGER" as "ADMIN" | "MANAGER" });
+  const [form, setForm] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    password: "",
+    role: (user?.role || "MANAGER") as UserRole,
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -162,10 +220,8 @@ function UserModal({ user, onClose, onSaved }: {
 
     try {
       if (user) {
-        // Update existing
         await updateUserProfile(user.id, { name: form.name, role: form.role });
       } else {
-        // Secondary Auth app keeps the current admin session intact
         const { app: secondaryApp, auth: secondaryAuth } = createSecondaryAuth();
         try {
           const cred = await createUserWithEmailAndPassword(secondaryAuth, form.email, form.password);
@@ -195,6 +251,9 @@ function UserModal({ user, onClose, onSaved }: {
           {!user && (
             <p className="text-xs text-gray-500 mt-1">Creates an Auth account and a Firestore profile with the selected role.</p>
           )}
+          {user && !user.role && (
+            <p className="text-xs text-amber-600 mt-1">This user signed up with Google and needs a role assigned.</p>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -219,19 +278,23 @@ function UserModal({ user, onClose, onSaved }: {
           )}
           <div>
             <label className="text-xs font-medium text-gray-700 mb-1.5 block">Role</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(["ADMIN", "MANAGER"] as const).map((r) => (
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { r: "ADMIN" as const, active: "border-purple-500 bg-purple-50 text-purple-700", Icon: Shield },
+                { r: "MANAGER" as const, active: "border-blue-500 bg-blue-50 text-blue-700", Icon: Eye },
+                { r: "DEVELOPER" as const, active: "border-teal-500 bg-teal-50 text-teal-700", Icon: Code },
+              ]).map(({ r, active, Icon }) => (
                 <button key={r} type="button" onClick={() => setForm((f) => ({ ...f, role: r }))}
-                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${form.role === r ? (r === "ADMIN" ? "border-purple-500 bg-purple-50 text-purple-700" : "border-blue-500 bg-blue-50 text-blue-700") : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
-                  {r === "ADMIN" ? <Shield className="w-4 h-4" /> : <Eye className="w-4 h-4" />} {r}
+                  className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-xl border-2 text-xs font-medium transition-all ${form.role === r ? active : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+                  <Icon className="w-4 h-4" /> {r}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {form.role === "ADMIN"
-                ? "Admins can create, edit, delete records and change opportunity status."
-                : "Managers can initiate opportunities and log activities on assigned deals."}
-            </p>
+            {form.role === "DEVELOPER" && (
+              <p className="text-xs text-teal-700 mt-2">
+                Can create opportunities, meeting notes, calendar events, and research. Can edit only their own records. Cannot delete. Cannot be Owner/Co-Owner.
+              </p>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 font-medium">Cancel</button>

@@ -46,6 +46,12 @@ const CASES = [
     expectRole: "MANAGER",
     expectIsAdmin: false,
   },
+  {
+    email: env.BOOTSTRAP_DEVELOPER_EMAIL || "developer@smarttive.com",
+    password: env.BOOTSTRAP_DEVELOPER_PASSWORD || "SmarttiveDev2026!",
+    expectRole: "DEVELOPER",
+    expectIsAdmin: false,
+  },
 ];
 
 let failed = 0;

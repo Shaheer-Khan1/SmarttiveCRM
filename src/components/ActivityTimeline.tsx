@@ -5,11 +5,11 @@ import type { Activity } from "@/lib/firestore";
 
 interface Props {
   activities: Activity[];
-  isAdmin: boolean;
+  canDeleteActivity?: (activity: Activity) => boolean;
   onDelete?: (id: string) => void;
 }
 
-export default function ActivityTimeline({ activities, isAdmin, onDelete }: Props) {
+export default function ActivityTimeline({ activities, canDeleteActivity, onDelete }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
@@ -35,6 +35,7 @@ export default function ActivityTimeline({ activities, isAdmin, onDelete }: Prop
         {activities.map((activity) => {
           const isExpanded = expanded.has(activity.id);
           const hasExtra = activity.notes || (activity.attachments && activity.attachments.length > 0);
+          const showDelete = !!onDelete && !!canDeleteActivity?.(activity);
           return (
             <div key={activity.id} className="flex gap-4">
               <div className="flex-shrink-0 w-11 flex items-start justify-center pt-4">
@@ -60,7 +61,7 @@ export default function ActivityTimeline({ activities, isAdmin, onDelete }: Prop
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     )}
-                    {isAdmin && onDelete && (
+                    {showDelete && (
                       <button onClick={() => onDelete(activity.id)}
                         className="p-1 hover:bg-red-50 hover:text-red-500 rounded text-gray-400 transition-colors">
                         <Trash2 className="w-4 h-4" />

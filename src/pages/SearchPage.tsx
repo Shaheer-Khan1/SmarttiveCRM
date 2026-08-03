@@ -103,7 +103,7 @@ export default function SearchPage() {
                         <p className="font-medium text-gray-900 group-hover:text-blue-600">{opp.title}</p>
                         <p className="text-xs text-gray-500 mt-0.5">{opp.customerName}{opp.solution && ` · ${opp.solution}`}</p>
                       </div>
-                      <StatusBadge status={opp.status} />
+                      <StatusBadge status={opp.stage} />
                     </div>
                   </div>
                 ))}

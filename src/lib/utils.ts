@@ -37,9 +37,16 @@ export function getFollowUpColors(status: FollowUpStatus) {
 
 export function getStatusColors(status: string): string {
   switch (status) {
-    case "ACTIVE": return "text-blue-700 bg-blue-50 border-blue-200";
-    case "WON": return "text-green-700 bg-green-50 border-green-200";
-    case "LOST": return "text-red-700 bg-red-50 border-red-200";
+    case "ACTIVE":
+    case "LEAD":
+    case "QUALIFICATION": return "text-blue-700 bg-blue-50 border-blue-200";
+    case "POC": return "text-indigo-700 bg-indigo-50 border-indigo-200";
+    case "PROPOSAL":
+    case "NEGOTIATION": return "text-violet-700 bg-violet-50 border-violet-200";
+    case "WON":
+    case "CLOSED_WON": return "text-green-700 bg-green-50 border-green-200";
+    case "LOST":
+    case "CLOSED_LOST": return "text-red-700 bg-red-50 border-red-200";
     case "ON_HOLD": return "text-amber-700 bg-amber-50 border-amber-200";
     default: return "text-gray-700 bg-gray-50 border-gray-200";
   }
@@ -51,6 +58,46 @@ export function getStatusLabel(status: string): string {
     case "WON": return "Won";
     case "LOST": return "Lost";
     case "ON_HOLD": return "On Hold";
+    case "LEAD": return "Lead";
+    case "QUALIFICATION": return "Qualification";
+    case "POC": return "PoC";
+    case "PROPOSAL": return "Proposal / Quoting";
+    case "NEGOTIATION": return "Negotiation";
+    case "CLOSED_WON": return "Closed Won";
+    case "CLOSED_LOST": return "Closed Lost";
+    default: return status;
+  }
+}
+
+export const PIPELINE_STAGE_LABELS: Record<string, string> = {
+  LEAD: "Lead",
+  QUALIFICATION: "Qualification",
+  POC: "PoC",
+  PROPOSAL: "Proposal / Quoting",
+  NEGOTIATION: "Negotiation",
+  CLOSED_WON: "Closed Won",
+  CLOSED_LOST: "Closed Lost",
+};
+
+export const COUNTRIES = [
+  "Saudi Arabia", "UAE", "Qatar", "Bahrain", "Kuwait", "Oman",
+  "Egypt", "Jordan", "USA", "UK", "Other",
+];
+
+export const REGIONS = ["GCC", "MENA", "Europe", "Americas", "APAC", "Other"];
+
+export const CATALOG_COLORS = [
+  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+  "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#64748B",
+];
+
+export function getPocStatusLabel(status: string): string {
+  switch (status) {
+    case "NOT_STARTED": return "Not Started";
+    case "IN_PROGRESS": return "In Progress";
+    case "BLOCKED": return "Blocked";
+    case "COMPLETED": return "Completed";
+    case "FAILED": return "Failed";
     default: return status;
   }
 }
@@ -222,7 +269,9 @@ export function getPocStatusColors(status: string): string {
   switch (status) {
     case "COMPLETED": return "text-green-700 bg-green-50 border-green-200";
     case "IN_PROGRESS": return "text-blue-700 bg-blue-50 border-blue-200";
+    case "BLOCKED": return "text-amber-700 bg-amber-50 border-amber-200";
     case "FAILED": return "text-red-700 bg-red-50 border-red-200";
+    case "NOT_STARTED": return "text-gray-600 bg-gray-50 border-gray-200";
     default: return "text-gray-600 bg-gray-50 border-gray-200";
   }
 }

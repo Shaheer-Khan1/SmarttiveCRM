@@ -27,15 +27,22 @@ export interface GanttRow {
 const GROUP_META: Record<string, { icon: typeof Clock; color: string; bar: string; barFill: string }> = {
   "Calendar Events": { icon: Clock, color: "text-blue-700 bg-blue-50 border-blue-100", bar: "bg-blue-200", barFill: "bg-blue-500" },
   Opportunities: { icon: Target, color: "text-emerald-700 bg-emerald-50 border-emerald-100", bar: "bg-emerald-200", barFill: "bg-emerald-500" },
-  "Product Research": { icon: Package, color: "text-violet-700 bg-violet-50 border-violet-100", bar: "bg-violet-200", barFill: "bg-violet-500" },
+  "Research": { icon: Package, color: "text-violet-700 bg-violet-50 border-violet-100", bar: "bg-violet-200", barFill: "bg-violet-500" },
 };
 
-function oppProgress(status: Opportunity["status"]): number {
-  switch (status) {
-    case "WON": return 100;
+function oppProgress(stage: Opportunity["stage"] | Opportunity["status"]): number {
+  switch (stage) {
+    case "CLOSED_WON":
+    case "CLOSED_LOST":
+    case "WON":
     case "LOST": return 100;
-    case "ACTIVE": return 55;
+    case "NEGOTIATION": return 85;
+    case "PROPOSAL": return 70;
+    case "POC": return 55;
+    case "QUALIFICATION":
     case "ON_HOLD": return 35;
+    case "LEAD":
+    case "ACTIVE": return 25;
     default: return 25;
   }
 }
@@ -109,11 +116,11 @@ export function buildGanttRows(
         group: "Opportunities",
         title: o.title,
         subtitle: o.customerName,
-        assignee: o.assignedTo.map((a) => a.name).join(", ") || undefined,
+        assignee: [o.owner?.name, o.coOwner?.name].filter(Boolean).join(", ") || undefined,
         start: clipped.start,
         end: clipped.end,
-        progress: oppProgress(o.status),
-        label: getStatusLabel(o.status),
+        progress: oppProgress(o.stage),
+        label: getStatusLabel(o.stage),
         opportunity: o,
       });
     });
@@ -128,7 +135,7 @@ export function buildGanttRows(
       rows.push({
         id: p.id,
         kind: "product",
-        group: "Product Research",
+        group: "Research",
         title: p.name,
         subtitle: [p.vendorName, p.type === "SOFTWARE" ? "Software" : "Hardware"].filter(Boolean).join(" · "),
         assignee: p.assignedDeveloperName || p.createdByName,
@@ -141,7 +148,7 @@ export function buildGanttRows(
     });
   }
 
-  const order = ["Calendar Events", "Opportunities", "Product Research"];
+  const order = ["Calendar Events", "Opportunities", "Research"];
   return rows.sort((a, b) => {
     const g = order.indexOf(a.group) - order.indexOf(b.group);
     if (g !== 0) return g;

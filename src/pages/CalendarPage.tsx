@@ -20,6 +20,7 @@ import {
   RECURRENCE_OPTIONS, REMINDER_OPTIONS, formatDateTime,
   getStatusLabel, getProductStatusLabel,
 } from "@/lib/utils";
+import { canCreateCrmRecords, canDeleteRecord, canEditCalendarEvent } from "@/lib/permissions";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -43,6 +44,7 @@ const KIND_CHIP: Record<CalKind, string> = {
 
 export default function CalendarPage() {
   const { user, profile, isAdmin } = useAuth();
+  const canCreate = canCreateCrmRecords(profile);
   const navigate = useNavigate();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -108,8 +110,18 @@ export default function CalendarPage() {
     [events, opportunities, products, gridStart, gridEnd, filter],
   );
 
-  const openNew = (date: Date) => { setEditEvent(null); setModalDate(date); setShowModal(true); };
-  const openEdit = (e: CalendarEvent) => { setEditEvent(e); setModalDate(null); setShowModal(true); };
+  const openNew = (date: Date) => {
+    if (!canCreate) return;
+    setEditEvent(null);
+    setModalDate(date);
+    setShowModal(true);
+  };
+  const openEdit = (e: CalendarEvent) => {
+    if (!canEditCalendarEvent(e, profile, user?.uid)) return;
+    setEditEvent(e);
+    setModalDate(null);
+    setShowModal(true);
+  };
 
   const handleGanttClick = (row: GanttRow) => {
     if (row.kind === "event" && row.event) openEdit(row.event);
@@ -135,10 +147,12 @@ export default function CalendarPage() {
               <GanttChartSquare className="w-3.5 h-3.5" /> Timeline
             </button>
           </div>
-          <button onClick={() => openNew(selectedDay)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:bg-blue-700">
-            <Plus className="w-4 h-4" /> New Event
-          </button>
+          {canCreate && (
+            <button onClick={() => openNew(selectedDay)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:bg-blue-700">
+              <Plus className="w-4 h-4" /> New Event
+            </button>
+          )}
         </div>
       </div>
 
@@ -149,7 +163,7 @@ export default function CalendarPage() {
           { v: "ALL", label: "All", Icon: null },
           { v: "event", label: "Events", Icon: Clock },
           { v: "opportunity", label: "Opportunities", Icon: Target },
-          { v: "product", label: "Product Research", Icon: Package },
+          { v: "product", label: "Research", Icon: Package },
         ] as const).map(({ v, label, Icon }) => (
           <button key={v} onClick={() => setFilter(v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === v ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
@@ -250,9 +264,11 @@ export default function CalendarPage() {
             <div className="text-center py-10 text-gray-400">
               <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">Nothing scheduled</p>
-              <button onClick={() => openNew(selectedDay)} className="mt-3 text-xs text-blue-600 hover:underline">
-                + Add an event
-              </button>
+              {canCreate && (
+                <button onClick={() => openNew(selectedDay)} className="mt-3 text-xs text-blue-600 hover:underline">
+                  + Add an event
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -300,7 +316,7 @@ export default function CalendarPage() {
                         <span className="font-medium text-sm text-gray-900 truncate">{op.title}</span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 flex items-center gap-1"><Building2 className="w-3 h-3" /> {op.customerName}</p>
-                      <p className="text-xs text-gray-400 mt-1">Opportunity · {getStatusLabel(op.status)}</p>
+                      <p className="text-xs text-gray-400 mt-1">Opportunity · {getStatusLabel(op.stage)}</p>
                     </button>
                   );
                 }
@@ -331,7 +347,7 @@ export default function CalendarPage() {
           event={editEvent}
           defaultDate={modalDate}
           currentUser={{ id: user!.uid, name: profile?.name || "User" }}
-          canDelete={isAdmin || editEvent?.createdById === user?.uid}
+          canDelete={canDeleteRecord(profile, editEvent?.createdById, user?.uid)}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); }}
         />

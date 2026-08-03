@@ -23,6 +23,7 @@ import {
   computeScore, getScoreColors, getCompatibilityColors, getCompatibilityLabel,
   formatTimeAgo, formatDate,
 } from "@/lib/utils";
+import { canContributeToProduct, canEditProduct, canDeleteProduct, canDeleteRecord } from "@/lib/permissions";
 
 const TABS = ["Overview", "Technical", "Compatibility", "Commercial", "Evaluation", "Development"] as const;
 type Tab = typeof TABS[number];
@@ -60,6 +61,7 @@ export default function ProductDetailPage() {
 
   const handleStatusChange = async (status: ProductStatus) => {
     if (!product || status === product.status) return;
+    if (!canEditProduct(product, profile, user?.uid)) return;
     await updateProduct(id!, { status });
     await logActivity({
       entityType: "product", entityId: id!, action: "Changed status",
@@ -73,6 +75,7 @@ export default function ProductDetailPage() {
 
   const handleMaturityChange = async (level: MaturityLevel) => {
     if (!product || level === product.maturityLevel) return;
+    if (!canEditProduct(product, profile, user?.uid)) return;
     await updateProduct(id!, { maturityLevel: level });
     await logActivity({
       entityType: "product", entityId: id!, action: "Advanced maturity",
@@ -104,6 +107,7 @@ export default function ProductDetailPage() {
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !product) return;
+    if (!canContributeToProduct(product, profile, user?.uid)) return;
     await addProductComment(id!, newComment.trim(), me.id, me.name);
     setNewComment("");
     setComments(await getProductComments(id!));
@@ -112,7 +116,8 @@ export default function ProductDetailPage() {
   };
 
   const handleUpload = async (file: File | null) => {
-    if (!file) return;
+    if (!file || !product) return;
+    if (!canContributeToProduct(product, profile, user?.uid)) return;
     setUploading(true);
     try {
       await uploadProductDocument(file, id!, me);
@@ -126,6 +131,10 @@ export default function ProductDetailPage() {
 
   if (loading) return <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (!product) return <div className="text-center py-16 text-gray-500">Product not found</div>;
+
+  const canContribute = canContributeToProduct(product, profile, user?.uid);
+  const canEdit = canEditProduct(product, profile, user?.uid);
+  const canDelete = canDeleteProduct(product, profile, user?.uid);
 
   return (
     <div className="space-y-6">
@@ -145,10 +154,14 @@ export default function ProductDetailPage() {
             {[product.category, product.vendorName, product.version && `v${product.version}`].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {isAdmin && (
+        {(canEdit || canDelete) && (
           <div className="flex gap-2 flex-shrink-0">
-            <button onClick={() => setShowEdit(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"><Edit2 className="w-4 h-4" /> Edit</button>
-            <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+            {canEdit && (
+              <button onClick={() => setShowEdit(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"><Edit2 className="w-4 h-4" /> Edit</button>
+            )}
+            {canDelete && (
+              <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+            )}
           </div>
         )}
       </div>
@@ -165,9 +178,9 @@ export default function ProductDetailPage() {
           {MATURITY_LEVELS.map((m, i) => {
             const reached = i <= getMaturityIndex(product.maturityLevel);
             return (
-              <button key={m.value} disabled={!isAdmin} onClick={() => handleMaturityChange(m.value)}
+              <button key={m.value} disabled={!canEdit} onClick={() => handleMaturityChange(m.value)}
                 title={`${m.value} · ${m.label} — ${m.description}`}
-                className={`group flex-1 ${isAdmin ? "cursor-pointer" : "cursor-default"}`}>
+                className={`group flex-1 ${canEdit ? "cursor-pointer" : "cursor-default"}`}>
                 <div className={`h-2 rounded-full transition-colors ${reached ? "bg-blue-500" : "bg-gray-100"}`} />
                 <span className={`mt-1.5 block text-center text-[10px] font-medium ${reached ? "text-blue-600" : "text-gray-400"}`}>{m.value}</span>
                 <span className="block text-center text-[9px] text-gray-400 leading-tight">{m.label}</span>
@@ -178,7 +191,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Status workflow */}
-      {isAdmin && (
+      {canEdit && (
         <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-medium text-gray-400 px-1">Status</span>
           {PRODUCT_STATUSES.map((s) => (
@@ -292,7 +305,9 @@ export default function ProductDetailPage() {
               <h2 className="font-semibold text-gray-900 flex items-center gap-2"><FlaskConical className="w-4 h-4 text-gray-500" /> Proof of Concept
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{pocs.length}</span>
               </h2>
-              <button onClick={() => { setEditPoc(null); setShowPocModal(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"><Plus className="w-3.5 h-3.5" /> Add POC</button>
+              {canContribute && (
+                <button onClick={() => { setEditPoc(null); setShowPocModal(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"><Plus className="w-3.5 h-3.5" /> Add POC</button>
+              )}
             </div>
             {pocs.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">No POCs recorded.</p> : (
               <div className="space-y-3">
@@ -304,10 +319,12 @@ export default function ProductDetailPage() {
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${getPocStatusColors(p.status)}`}>{p.status.replace("_", " ")}</span>
                         <span className="text-sm font-medium text-gray-900">{p.owner}</span>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditPoc(p); setShowPocModal(true); }} className="p-1 text-gray-400 hover:text-gray-600"><Edit2 className="w-3.5 h-3.5" /></button>
-                        {isAdmin && <button onClick={async () => { if (confirm("Delete POC?")) { await deleteProductPOC(p.id); load(); } }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>}
-                      </div>
+                      {canContribute && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => { setEditPoc(p); setShowPocModal(true); }} className="p-1 text-gray-400 hover:text-gray-600"><Edit2 className="w-3.5 h-3.5" /></button>
+                          {isAdmin && <button onClick={async () => { if (confirm("Delete POC?")) { await deleteProductPOC(p.id); load(); } }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        </div>
+                      )}
                     </div>
                     {p.findings && <p className="text-xs text-gray-600 mt-2"><span className="font-medium">Findings:</span> {p.findings}</p>}
                     {p.recommendations && <p className="text-xs text-gray-600 mt-1"><span className="font-medium">Recommendation:</span> {p.recommendations}</p>}
@@ -332,7 +349,7 @@ export default function ProductDetailPage() {
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs font-semibold text-gray-900">{c.userName}</span>
                       <span className="text-xs text-gray-400">{formatTimeAgo(c.createdAt)}</span>
-                      {(isAdmin || c.userId === me.id) && (
+                      {canDeleteRecord(profile, c.userId, user?.uid) && (
                         <button onClick={async () => { if (confirm("Delete comment?")) { await deleteProductComment(c.id); setComments((x) => x.filter((y) => y.id !== c.id)); } }}
                           className="ml-auto opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
                       )}
@@ -342,13 +359,17 @@ export default function ProductDetailPage() {
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 pt-3 border-t border-gray-100">
-              <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handlePostComment()}
-                placeholder="Add a comment..."
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <button onClick={handlePostComment} disabled={!newComment.trim()} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"><Send className="w-4 h-4" /></button>
-            </div>
+            {canContribute ? (
+              <div className="flex gap-2 pt-3 border-t border-gray-100">
+                <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handlePostComment()}
+                  placeholder="Add a comment..."
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <button onClick={handlePostComment} disabled={!newComment.trim()} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"><Send className="w-4 h-4" /></button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 pt-3 border-t border-gray-100">You can comment when assigned as developer or reviewer on this product.</p>
+            )}
           </div>
         </div>
 
@@ -368,10 +389,12 @@ export default function ProductDetailPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-gray-500" /> Documents</h3>
-              <label className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg cursor-pointer hover:bg-blue-100">
-                <Upload className="w-3.5 h-3.5" /> {uploading ? "..." : "Upload"}
-                <input type="file" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0] || null)} />
-              </label>
+              {canContribute && (
+                <label className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg cursor-pointer hover:bg-blue-100">
+                  <Upload className="w-3.5 h-3.5" /> {uploading ? "..." : "Upload"}
+                  <input type="file" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0] || null)} />
+                </label>
+              )}
             </div>
             {documents.length === 0 ? <p className="text-xs text-gray-400 text-center py-3">No documents.</p> : (
               <div className="space-y-2">
@@ -380,7 +403,9 @@ export default function ProductDetailPage() {
                     <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-gray-700 hover:text-blue-600 truncate flex-1">{d.documentName}</a>
                     <a href={d.fileUrl} target="_blank" rel="noreferrer" className="p-1 text-gray-300 hover:text-blue-500"><Download className="w-3.5 h-3.5" /></a>
-                    {isAdmin && <button onClick={async () => { if (confirm("Delete document?")) { await deleteProductDocument(d.id, d.storagePath); setDocuments((x) => x.filter((y) => y.id !== d.id)); } }} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5" /></button>}
+                    {canDeleteRecord(profile, d.uploadedById, user?.uid) && (
+                      <button onClick={async () => { if (confirm("Delete document?")) { await deleteProductDocument(d.id, d.storagePath); setDocuments((x) => x.filter((y) => y.id !== d.id)); } }} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
+                    )}
                   </div>
                 ))}
               </div>

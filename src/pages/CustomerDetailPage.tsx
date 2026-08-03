@@ -4,10 +4,12 @@ import { ArrowLeft, Building2, Globe, Phone, Mail, Edit2, Trash2, Plus } from "l
 import { getCustomer, updateCustomer, deleteCustomer, getOpportunities, type Customer, type Opportunity } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
 import OpportunityCard from "@/components/OpportunityCard";
+import { canCreateCrmRecords } from "@/lib/permissions";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile } = useAuth();
+  const canCreate = canCreateCrmRecords(profile);
   const navigate = useNavigate();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [opps, setOpps] = useState<Opportunity[]>([]);
@@ -91,7 +93,7 @@ export default function CustomerDetailPage() {
             Opportunities
             <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{opps.length}</span>
           </h2>
-          {isAdmin && (
+          {canCreate && (
             <Link to={`/opportunities/new?customerId=${id}`}
               className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
               <Plus className="w-4 h-4" /> Add Opportunity

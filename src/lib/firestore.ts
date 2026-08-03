@@ -8,11 +8,15 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type UserRole = "ADMIN" | "MANAGER" | "DEVELOPER";
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "MANAGER";
+  /** null = signed up (e.g. Google) but not yet assigned by an admin */
+  role: UserRole | null;
+  photoURL?: string | null;
   createdAt: Date;
 }
 
@@ -36,12 +40,26 @@ export interface AssignedPerson {
   name: string;
 }
 
+export type OpportunityStage =
+  | "LEAD"
+  | "QUALIFICATION"
+  | "POC"
+  | "PROPOSAL"
+  | "NEGOTIATION"
+  | "CLOSED_WON"
+  | "CLOSED_LOST";
+
 export interface Opportunity {
   id: string;
   title: string;
   customerId: string;
   customerName: string;
-  status: "ACTIVE" | "WON" | "LOST" | "ON_HOLD";
+  /** @deprecated use stage — kept for legacy docs */
+  status?: "ACTIVE" | "WON" | "LOST" | "ON_HOLD";
+  stage: OpportunityStage;
+  country: string;
+  region?: string | null;
+  closeDate?: Date | null;
   holdReason?: string;
   solution?: string;
   value?: number | null;
@@ -49,6 +67,9 @@ export interface Opportunity {
   nextStep?: string;
   notes?: string;
   tags: string[];
+  owner: AssignedPerson;
+  coOwner: AssignedPerson | null;
+  /** @deprecated use owner/coOwner */
   assignedTo: AssignedPerson[];
   initiatedById?: string;
   initiatedByName?: string;
@@ -117,11 +138,14 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     });
     const data = JSON.parse(jsonStr) as Record<string, string>;
 
+    const role = parseUserRole(data.role);
+
     return {
       id: snap.id,
       name: data.name ?? "",
       email: data.email ?? "",
-      role: (data.role as "ADMIN" | "MANAGER") ?? "MANAGER",
+      role,
+      photoURL: (data.photoURL as string | undefined) || null,
       createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
     };
   } catch (err) {
@@ -130,9 +154,61 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   }
 }
 
+function parseUserRole(role: unknown): UserRole | null {
+  return role === "ADMIN" || role === "MANAGER" || role === "DEVELOPER" ? role : null;
+}
+
+/** Create a Firestore profile on first Google (or other) sign-in with no role. */
+export async function ensureUserProfile(user: {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}): Promise<UserProfile> {
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const d = snap.data();
+    return {
+      id: snap.id,
+      name: (d.name as string) || user.displayName || "",
+      email: (d.email as string) || user.email || "",
+      role: parseUserRole(d.role),
+      photoURL: (d.photoURL as string) || user.photoURL || null,
+      createdAt: toDate(d.createdAt as Timestamp),
+    };
+  }
+  const name = user.displayName || user.email?.split("@")[0] || "User";
+  await setDoc(ref, {
+    name,
+    email: user.email || "",
+    role: null,
+    photoURL: user.photoURL || null,
+    createdAt: serverTimestamp(),
+  });
+  return {
+    id: user.uid,
+    name,
+    email: user.email || "",
+    role: null,
+    photoURL: user.photoURL || null,
+    createdAt: new Date(),
+  };
+}
+
 export async function getUsers(): Promise<UserProfile[]> {
   const snap = await getDocs(query(collection(db, "users"), orderBy("name")));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: toDate(d.data().createdAt) } as UserProfile));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      name: (data.name as string) || "",
+      email: (data.email as string) || "",
+      role: parseUserRole(data.role),
+      photoURL: (data.photoURL as string) || null,
+      createdAt: toDate(data.createdAt as Timestamp),
+    };
+  });
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
@@ -178,12 +254,25 @@ export async function deleteCustomer(id: string) {
 
 // ─── Opportunities ────────────────────────────────────────────────────────────
 
-export async function getOpportunities(filters?: { status?: string; customerId?: string }): Promise<Opportunity[]> {
+function legacyStatusToStage(status?: string): OpportunityStage {
+  switch (status) {
+    case "WON": return "CLOSED_WON";
+    case "LOST": return "CLOSED_LOST";
+    case "ON_HOLD": return "QUALIFICATION";
+    case "ACTIVE":
+    default: return "LEAD";
+  }
+}
+
+export async function getOpportunities(filters?: { stage?: string; customerId?: string }): Promise<Opportunity[]> {
   const constraints: QueryConstraint[] = [orderBy("updatedAt", "desc")];
-  if (filters?.status && filters.status !== "ALL") constraints.unshift(where("status", "==", filters.status));
   if (filters?.customerId) constraints.unshift(where("customerId", "==", filters.customerId));
   const snap = await getDocs(query(collection(db, "opportunities"), ...constraints));
-  return snap.docs.map(docToOpportunity);
+  let list = snap.docs.map(docToOpportunity);
+  if (filters?.stage && filters.stage !== "ALL") {
+    list = list.filter((o) => o.stage === filters.stage);
+  }
+  return list;
 }
 
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
@@ -194,43 +283,108 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
 
 function docToOpportunity(snap: { id: string; data: () => Record<string, unknown> }): Opportunity {
   const d = snap.data();
-  // Migrate legacy single-assign fields to the assignedTo array format
   let assignedTo: AssignedPerson[] = [];
   if (Array.isArray(d.assignedTo)) {
     assignedTo = d.assignedTo as AssignedPerson[];
   } else if (d.assignedToId && d.assignedToName) {
     assignedTo = [{ id: d.assignedToId as string, name: d.assignedToName as string }];
   }
+
+  const owner = (d.owner as AssignedPerson | undefined)
+    || assignedTo[0]
+    || { id: (d.initiatedById as string) || "", name: (d.initiatedByName as string) || "Unassigned" };
+  const coOwner = (d.coOwner as AssignedPerson | null | undefined) !== undefined
+    ? (d.coOwner as AssignedPerson | null)
+    : (assignedTo[1] || null);
+
+  const stage = (d.stage as OpportunityStage | undefined)
+    || legacyStatusToStage(d.status as string | undefined);
+
   return {
     id: snap.id,
-    ...d,
-    assignedTo,
-    tags: Array.isArray(d.tags) ? d.tags : [],
+    title: (d.title as string) || "",
+    customerId: (d.customerId as string) || "",
+    customerName: (d.customerName as string) || "",
+    status: d.status as Opportunity["status"],
+    stage,
+    country: (d.country as string) || "",
+    region: (d.region as string) || null,
+    closeDate: d.closeDate ? toDate(d.closeDate as Timestamp) : null,
+    holdReason: d.holdReason as string | undefined,
+    solution: d.solution as string | undefined,
+    value: (d.value as number | null | undefined) ?? null,
+    currency: (d.currency as string) || "SAR",
+    nextStep: d.nextStep as string | undefined,
+    notes: d.notes as string | undefined,
+    tags: Array.isArray(d.tags) ? d.tags as string[] : [],
+    owner,
+    coOwner,
+    assignedTo: assignedTo.length ? assignedTo : [owner, ...(coOwner ? [coOwner] : [])],
+    initiatedById: d.initiatedById as string | undefined,
+    initiatedByName: d.initiatedByName as string | undefined,
     lastActivityDate: d.lastActivityDate ? toDate(d.lastActivityDate as Timestamp) : null,
     createdAt: toDate(d.createdAt as Timestamp),
     updatedAt: toDate(d.updatedAt as Timestamp),
-  } as Opportunity;
+  };
 }
 
-export async function createOpportunity(data: Omit<Opportunity, "id" | "createdAt" | "updatedAt">): Promise<string> {
-  const ref = await addDoc(collection(db, "opportunities"), {
-    ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  });
+export async function createOpportunity(
+  data: Omit<Opportunity, "id" | "createdAt" | "updatedAt" | "assignedTo" | "status"> & {
+    assignedTo?: AssignedPerson[];
+    status?: Opportunity["status"];
+  },
+): Promise<string> {
+  const owner = data.owner;
+  const coOwner = data.coOwner ?? null;
+  const assignedTo = [owner, ...(coOwner ? [coOwner] : [])];
+  const payload = {
+    ...data,
+    owner,
+    coOwner,
+    assignedTo,
+    stage: data.stage || "LEAD",
+    country: data.country || "",
+    closeDate: data.closeDate ? Timestamp.fromDate(data.closeDate) : null,
+    status: data.stage === "CLOSED_WON" ? "WON" : data.stage === "CLOSED_LOST" ? "LOST" : "ACTIVE",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const ref = await addDoc(collection(db, "opportunities"), payload);
   return ref.id;
 }
 
 export async function updateOpportunity(id: string, data: Partial<Opportunity>) {
-  await updateDoc(doc(db, "opportunities", id), { ...data, updatedAt: serverTimestamp() });
+  const payload: Record<string, unknown> = { ...data, updatedAt: serverTimestamp() };
+  if (data.closeDate !== undefined) {
+    payload.closeDate = data.closeDate ? Timestamp.fromDate(data.closeDate) : null;
+  }
+  if (data.owner || data.coOwner !== undefined) {
+    const owner = data.owner;
+    const coOwner = data.coOwner ?? null;
+    if (owner) {
+      payload.assignedTo = [owner, ...(coOwner ? [coOwner] : [])];
+    }
+  }
+  if (data.stage) {
+    payload.status = data.stage === "CLOSED_WON" ? "WON" : data.stage === "CLOSED_LOST" ? "LOST" : "ACTIVE";
+  }
+  delete payload.createdAt;
+  delete payload.id;
+  await updateDoc(doc(db, "opportunities", id), payload);
 }
 
 export async function deleteOpportunity(id: string) {
-  const [actSnap, commentSnap] = await Promise.all([
+  const [actSnap, commentSnap, productSnap, eventSnap] = await Promise.all([
     getDocs(query(collection(db, "activities"), where("opportunityId", "==", id))),
     getDocs(collection(db, "opportunities", id, "comments")),
+    getDocs(collection(db, "opportunities", id, "products")),
+    getDocs(collection(db, "opportunities", id, "events")),
   ]);
   const batch = writeBatch(db);
   actSnap.docs.forEach((d) => batch.delete(d.ref));
   commentSnap.docs.forEach((d) => batch.delete(d.ref));
+  productSnap.docs.forEach((d) => batch.delete(d.ref));
+  eventSnap.docs.forEach((d) => batch.delete(d.ref));
   batch.delete(doc(db, "opportunities", id));
   await batch.commit();
 }
@@ -238,10 +392,13 @@ export async function deleteOpportunity(id: string) {
 // ─── Activities ───────────────────────────────────────────────────────────────
 
 export async function getActivities(opportunityId: string): Promise<Activity[]> {
+  // Equality-only query avoids a composite index; sort newest-first in memory.
   const snap = await getDocs(
-    query(collection(db, "activities"), where("opportunityId", "==", opportunityId), orderBy("date", "desc"))
+    query(collection(db, "activities"), where("opportunityId", "==", opportunityId)),
   );
-  return snap.docs.map(docToActivity);
+  return snap.docs
+    .map(docToActivity)
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
 function docToActivity(snap: { id: string; data: () => Record<string, unknown> }): Activity {
@@ -286,11 +443,9 @@ export async function createActivity(data: {
 export async function deleteActivity(id: string, opportunityId: string) {
   await deleteDoc(doc(db, "activities", id));
 
-  // Recalculate lastActivityDate
-  const snap = await getDocs(
-    query(collection(db, "activities"), where("opportunityId", "==", opportunityId), orderBy("date", "desc"), limit(1))
-  );
-  const lastDate = snap.docs[0]?.data().date || null;
+  // Recalculate lastActivityDate (client sort — no composite index required)
+  const remaining = await getActivities(opportunityId);
+  const lastDate = remaining[0] ? Timestamp.fromDate(remaining[0].date) : null;
   await updateDoc(doc(db, "opportunities", opportunityId), {
     lastActivityDate: lastDate,
     updatedAt: serverTimestamp(),
@@ -1124,19 +1279,108 @@ export async function seedDemoData(adminUid: string, adminName: string) {
   const manager = allUsers.find((u) => u.role === "MANAGER" && u.id !== adminUid);
   const managerPerson = manager ? { id: manager.id, name: manager.name } : null;
 
-  await setDoc(psimRef, { title: "PSIM + OrcaTwin Platform", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "PSIM, OrcaTwin Digital Twin", assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson], nextStep: "Submit technical proposal after completing PoC demo", tags: ["Security", "Enterprise"], notes: "KFUPM campus security integration project. High priority.", value: 850000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(2)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  // Product catalog + tags for CRM seed
+  const catColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6"];
+  const catalogItems = [
+    { name: "PSIM Platform", color: catColors[0] },
+    { name: "Smart Parking", color: catColors[1] },
+    { name: "Video Analytics", color: catColors[2] },
+    { name: "NOC Platform", color: catColors[3] },
+  ];
+  const catalogIds: { id: string; name: string; color: string }[] = [];
+  for (const item of catalogItems) {
+    const ref = doc(collection(db, "product_catalog"));
+    await setDoc(ref, { name: item.name, color: item.color, active: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    catalogIds.push({ id: ref.id, name: item.name, color: item.color });
+  }
+  for (const tag of ["Security", "Enterprise", "Parking", "Video Analytics", "Networking"]) {
+    await setDoc(doc(collection(db, "tags")), {
+      name: tag, nameLower: tag.toLowerCase(), usageCount: 1, createdAt: serverTimestamp(),
+    });
+  }
+
+  const closeIn = (d: number) => Timestamp.fromDate(new Date(now.getTime() + d * 24 * 60 * 60 * 1000));
+
+  await setDoc(psimRef, {
+    title: "PSIM + OrcaTwin Platform", customerId: kfupmRef.id, customerName: "KFUPM",
+    status: "ACTIVE", stage: "POC", country: "Saudi Arabia", region: "GCC",
+    closeDate: closeIn(45),
+    solution: "PSIM, OrcaTwin Digital Twin",
+    owner: adminPerson, coOwner: managerPerson,
+    assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson],
+    nextStep: "Submit technical proposal after completing PoC demo",
+    tags: ["Security", "Enterprise"], notes: "KFUPM campus security integration project. High priority.",
+    value: 850000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(2)),
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  await setDoc(doc(collection(db, "opportunities", psimRef.id, "products")), {
+    productId: catalogIds[0].id, productName: catalogIds[0].name, color: catalogIds[0].color,
+    requiresPoc: true, pocStatus: "IN_PROGRESS", lastUpdatedAt: Timestamp.fromDate(daysAgo(2)),
+    lastUpdatedById: adminUid, lastUpdatedByName: adminName,
+  });
 
   const parkingRef = doc(collection(db, "opportunities"));
-  await setDoc(parkingRef, { title: "Smart Parking System", customerId: kfupmRef.id, customerName: "KFUPM", status: "ACTIVE", solution: "Smart Parking Management", assignedTo: managerPerson ? [managerPerson] : [adminPerson], nextStep: "Follow up with facilities team on site survey date", tags: ["Parking"], value: 320000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(6)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(parkingRef, {
+    title: "Smart Parking System", customerId: kfupmRef.id, customerName: "KFUPM",
+    status: "ACTIVE", stage: "QUALIFICATION", country: "Saudi Arabia", region: "GCC",
+    closeDate: closeIn(60),
+    solution: "Smart Parking Management",
+    owner: managerPerson || adminPerson, coOwner: managerPerson ? adminPerson : null,
+    assignedTo: managerPerson ? [managerPerson, adminPerson] : [adminPerson],
+    nextStep: "Follow up with facilities team on site survey date",
+    tags: ["Parking"], value: 320000, currency: "SAR",
+    lastActivityDate: Timestamp.fromDate(daysAgo(6)),
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  await setDoc(doc(collection(db, "opportunities", parkingRef.id, "products")), {
+    productId: catalogIds[1].id, productName: catalogIds[1].name, color: catalogIds[1].color,
+    requiresPoc: true, pocStatus: "NOT_STARTED", lastUpdatedAt: null,
+  });
 
   const videoRef = doc(collection(db, "opportunities"));
-  await setDoc(videoRef, { title: "Video Compression Solution", customerId: kfupmRef.id, customerName: "KFUPM", status: "ON_HOLD", holdReason: "Budget freeze until Q3 2026 – customer to revisit after internal review", solution: "Video Compression", assignedTo: [adminPerson], tags: ["Video Analytics"], value: 175000, currency: "SAR", lastActivityDate: null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(videoRef, {
+    title: "Video Compression Solution", customerId: kfupmRef.id, customerName: "KFUPM",
+    status: "ACTIVE", stage: "LEAD", country: "Saudi Arabia", region: "GCC",
+    holdReason: "Budget freeze until Q3 2026 – customer to revisit after internal review",
+    solution: "Video Compression",
+    owner: adminPerson, coOwner: null, assignedTo: [adminPerson],
+    tags: ["Video Analytics"], value: 175000, currency: "SAR", lastActivityDate: null,
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
 
   const aramcoOppRef = doc(collection(db, "opportunities"));
-  await setDoc(aramcoOppRef, { title: "Perimeter Surveillance & Analytics", customerId: aramcoRef.id, customerName: "Saudi Aramco", status: "ACTIVE", solution: "AI Video Analytics, Perimeter Security", assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson], nextStep: "Prepare ROI report requested by security director", tags: ["Security", "Video Analytics"], value: 2400000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(9)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(aramcoOppRef, {
+    title: "Perimeter Surveillance & Analytics", customerId: aramcoRef.id, customerName: "Saudi Aramco",
+    status: "ACTIVE", stage: "PROPOSAL", country: "Saudi Arabia", region: "GCC",
+    closeDate: closeIn(90),
+    solution: "AI Video Analytics, Perimeter Security",
+    owner: adminPerson, coOwner: managerPerson,
+    assignedTo: managerPerson ? [adminPerson, managerPerson] : [adminPerson],
+    nextStep: "Prepare ROI report requested by security director",
+    tags: ["Security", "Video Analytics"], value: 2400000, currency: "SAR",
+    lastActivityDate: Timestamp.fromDate(daysAgo(9)),
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  await setDoc(doc(collection(db, "opportunities", aramcoOppRef.id, "products")), {
+    productId: catalogIds[2].id, productName: catalogIds[2].name, color: catalogIds[2].color,
+    requiresPoc: true, pocStatus: "COMPLETED", lastUpdatedAt: Timestamp.fromDate(daysAgo(9)),
+    lastUpdatedById: adminUid, lastUpdatedByName: adminName,
+  });
 
   const mocOppRef = doc(collection(db, "opportunities"));
-  await setDoc(mocOppRef, { title: "Network Monitoring Platform", customerId: mocRef.id, customerName: "Ministry of Communications", status: "WON", solution: "NOC Platform, Network Analytics", assignedTo: [adminPerson], tags: ["Networking", "Enterprise"], value: 680000, currency: "SAR", lastActivityDate: Timestamp.fromDate(daysAgo(15)), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(mocOppRef, {
+    title: "Network Monitoring Platform", customerId: mocRef.id, customerName: "Ministry of Communications",
+    status: "WON", stage: "CLOSED_WON", country: "Saudi Arabia", region: "GCC",
+    solution: "NOC Platform, Network Analytics",
+    owner: adminPerson, coOwner: null, assignedTo: [adminPerson],
+    tags: ["Networking", "Enterprise"], value: 680000, currency: "SAR",
+    lastActivityDate: Timestamp.fromDate(daysAgo(15)),
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  await setDoc(doc(collection(db, "opportunities", mocOppRef.id, "products")), {
+    productId: catalogIds[3].id, productName: catalogIds[3].name, color: catalogIds[3].color,
+    requiresPoc: false, pocStatus: "NOT_STARTED", lastUpdatedAt: null,
+  });
 
   // Activities
   const activities = [

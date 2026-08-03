@@ -1,24 +1,32 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { getUserProfile, type UserProfile } from "@/lib/firestore";
+import { ensureUserProfile, getUserProfile, type UserProfile } from "@/lib/firestore";
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isManager: boolean;
+  isDeveloper: boolean;
+  /** True when profile exists and has ADMIN, MANAGER, or DEVELOPER */
+  hasRole: boolean;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const googleProvider = new GoogleAuthProvider();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -27,10 +35,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = async (u: User) => {
     let p = await getUserProfile(u.uid);
-    // Retry once after a short delay if not found (Firestore propagation delay)
     if (!p) {
-      await new Promise((r) => setTimeout(r, 1500));
-      p = await getUserProfile(u.uid);
+      // First Google (or OAuth) sign-in — create profile with no role
+      p = await ensureUserProfile({
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL,
+      });
     }
     setProfile(p);
   };
@@ -52,6 +64,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
+  const signInWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    await ensureUserProfile({
+      uid: result.user.uid,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      photoURL: result.user.photoURL,
+    });
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
@@ -60,6 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) await loadProfile(user);
   };
 
+  const role = profile?.role ?? null;
+
   return (
     <AuthContext.Provider
       value={{
@@ -67,8 +91,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         signIn,
+        signInWithGoogle,
         signOut,
-        isAdmin: profile?.role === "ADMIN",
+        isAdmin: role === "ADMIN",
+        isManager: role === "MANAGER",
+        isDeveloper: role === "DEVELOPER",
+        hasRole: role === "ADMIN" || role === "MANAGER" || role === "DEVELOPER",
         refreshProfile,
       }}
     >

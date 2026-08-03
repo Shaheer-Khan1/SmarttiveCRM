@@ -80,7 +80,21 @@ VITE_FIREBASE_APP_ID=1:123456789:web:abc123
 
 ---
 
-## Step 5: Create Role Accounts
+## Step 5: Enable Google Sign-In
+
+1. Firebase Console → **Authentication** → **Sign-in method**
+2. Enable **Google** and save
+3. Under **Authentication → Settings → Authorized domains**, add:
+   - `localhost` (local dev)
+   - your Render domain (e.g. `your-app.onrender.com`)
+
+Anyone can sign in with Gmail. New Google users are created with **no role** and see a pending screen until an Admin assigns Admin, Manager, or Developer under **Admin → Users**.
+
+**Roles:** Owner / Co-Owner on opportunities may only be Admin or Manager. Developers can create opportunities, meeting notes, calendar events, and research; they can edit only records they created and cannot delete anything. Managers may delete only records they created; only Admin can delete anyone else’s records.
+
+---
+
+## Step 5b: Create Role Accounts (email/password)
 
 Create one Auth user + Firestore profile per role:
 
@@ -94,6 +108,7 @@ Default test accounts (override with `BOOTSTRAP_*` env vars if needed):
 |------|-------|----------|
 | ADMIN | `admin@smarttive.com` | `SmarttiveAdmin2026!` |
 | MANAGER | `manager@smarttive.com` | `SmarttiveManager2026!` |
+| DEVELOPER | `developer@smarttive.com` | `SmarttiveDev2026!` |
 
 Verify roles against Firebase:
 
@@ -125,12 +140,29 @@ This is a Vite SPA. The browser must load files from **`dist/`**, not the repo r
 2. Build Command: `npm install && npm run build`
 3. Publish Directory: **`dist`** (not `.` or empty)
 4. Add SPA rewrite: Source `/*` → Destination `/index.html`
-5. Set all `VITE_FIREBASE_*` env vars, then redeploy
+5. Set all `VITE_FIREBASE_*` env vars (**before** building), then redeploy
 
 ### Option B — Web Service
 1. Build Command: `npm install && npm run build`
 2. Start Command: **`npm start`** (serves `dist/` with correct JS MIME types on `$PORT`)
-3. Set all `VITE_FIREBASE_*` env vars, then redeploy
+3. Set all `VITE_FIREBASE_*` env vars (**before** building), then redeploy
+
+### Firebase env vars (required at build time)
+
+Vite inlines `import.meta.env.VITE_*` during `npm run build`. Runtime-only env vars are ignored.
+
+In Render → **Environment**, add exactly these keys (copy values from your local `.env`):
+
+```
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+```
+
+Then **Manual Deploy → Clear build cache & deploy**. A normal restart is not enough.
 
 ---
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import { ArrowLeft, Code, Cpu, Plus, Trash2, AlertTriangle, ArrowRight } from "lucide-react";
 import {
   getVendors, getUsers, getProducts, createVendor, createProduct, createNotification,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { PRODUCT_PRIORITIES, MATURITY_LEVELS, COMPATIBILITY_STATUSES, getCompatibilityLabel } from "@/lib/utils";
+import { canCreateCrmRecords } from "@/lib/permissions";
 
 const linesToArray = (s: string): string[] => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -48,6 +49,10 @@ export default function NewProductPage() {
       .filter((p) => p.name.toLowerCase().includes(q) || q.includes(p.name.toLowerCase()))
       .slice(0, 4);
   }, [form.name, allProducts]);
+
+  if (!canCreateCrmRecords(profile)) {
+    return <Navigate to="/products" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +121,7 @@ export default function NewProductPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
         <Link to="/products" className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><ArrowLeft className="w-4 h-4 text-gray-600" /></Link>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">New Product Research</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">New Research</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">

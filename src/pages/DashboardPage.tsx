@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Target, Building2, TrendingUp, AlertTriangle, CheckCircle, PauseCircle, XCircle, ArrowRight, Clock } from "lucide-react";
 import OpportunityCard from "@/components/OpportunityCard";
 import GlobalProgressCalendar from "@/components/GlobalProgressCalendar";
-import { getDashboardData, type Opportunity, type Activity } from "@/lib/firestore";
+import FilterBar, { emptyFilters, type GlobalFilters } from "@/components/FilterBar";
+import { getDashboardData, getUsers, type Opportunity, type Activity, type UserProfile } from "@/lib/firestore";
 import { getFollowUpStatus } from "@/lib/utils";
 
 interface Stats {
@@ -14,12 +15,16 @@ interface Stats {
 export default function DashboardPage() {
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<GlobalFilters>(emptyFilters());
 
   useEffect(() => {
+    getUsers().then(setUsers).catch(() => {});
     getDashboardData().then(({ opportunities, activities: allActivities, totalCustomers }) => {
-      const active = opportunities.filter((o) => o.status === "ACTIVE");
+      const open = (o: Opportunity) => o.stage !== "CLOSED_WON" && o.stage !== "CLOSED_LOST";
+      const active = opportunities.filter(open);
       let redFlags = 0, warnings = 0;
       active.forEach((o) => {
         const s = getFollowUpStatus(o.lastActivityDate || null);
@@ -29,9 +34,9 @@ export default function DashboardPage() {
       setStats({
         total: opportunities.length,
         active: active.length,
-        won: opportunities.filter((o) => o.status === "WON").length,
-        lost: opportunities.filter((o) => o.status === "LOST").length,
-        onHold: opportunities.filter((o) => o.status === "ON_HOLD").length,
+        won: opportunities.filter((o) => o.stage === "CLOSED_WON").length,
+        lost: opportunities.filter((o) => o.stage === "CLOSED_LOST").length,
+        onHold: opportunities.filter((o) => o.stage === "QUALIFICATION").length,
         customers: totalCustomers,
         redFlags,
         warnings,
@@ -42,25 +47,39 @@ export default function DashboardPage() {
     });
   }, []);
 
+  const filteredOpps = useMemo(() => opps.filter((opp) => {
+    if (filters.country && opp.country !== filters.country) return false;
+    if (filters.region && opp.region !== filters.region) return false;
+    if (filters.stage && opp.stage !== filters.stage) return false;
+    if (filters.tag && !opp.tags.includes(filters.tag)) return false;
+    if (filters.peopleId && opp.owner?.id !== filters.peopleId && opp.coOwner?.id !== filters.peopleId) return false;
+    return true;
+  }), [opps, filters]);
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
-  const active = opps.filter((o) => o.status === "ACTIVE");
+  const active = filteredOpps.filter((o) => o.stage !== "CLOSED_WON" && o.stage !== "CLOSED_LOST");
   const redFlagOpps = active.filter((o) => {
     const s = getFollowUpStatus(o.lastActivityDate || null);
     return s === "RED_FLAG" || s === "NO_ACTIVITY";
   });
   const warningOpps = active.filter((o) => getFollowUpStatus(o.lastActivityDate || null) === "WARNING");
+  const allTags = Array.from(new Set(opps.flatMap((o) => o.tags)));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Overview of your sales pipeline and follow-up status</p>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">Overview of your sales pipeline and follow-up status</p>
+        </div>
       </div>
+
+      <FilterBar value={filters} onChange={setFilters} users={users} tags={allTags} showStage />
 
       {(stats!.redFlags > 0 || stats!.warnings > 0) && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
@@ -77,7 +96,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats Row 1 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <StatCard icon={Target} label="Total Opportunities" value={stats!.total} color="blue" />
         <StatCard icon={TrendingUp} label="Active" value={stats!.active} color="blue" />
         <StatCard icon={CheckCircle} label="Won" value={stats!.won} color="green" />
@@ -85,7 +104,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row 2 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <StatCard icon={AlertTriangle} label="Red Flags" value={stats!.redFlags} color="red" href="/opportunities?followUp=RED_FLAG" />
         <StatCard icon={Clock} label="Warnings" value={stats!.warnings} color="amber" href="/opportunities?followUp=WARNING" />
         <StatCard icon={PauseCircle} label="On Hold" value={stats!.onHold} color="amber" />
@@ -136,7 +155,7 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {opps.slice(0, 6).map((opp) => <OpportunityCard key={opp.id} opp={opp} />)}
+          {filteredOpps.slice(0, 6).map((opp) => <OpportunityCard key={opp.id} opp={opp} />)}
         </div>
       </section>
     </div>
@@ -152,12 +171,12 @@ function StatCard({ icon: Icon, label, value, color, href }: {
     purple: "bg-purple-50 text-purple-600", gray: "bg-gray-50 text-gray-500",
   };
   const card = (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 hover:shadow-sm transition-all">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${colorMap[color]}`}>
+    <div className="panel p-3.5 sm:p-4 hover:border-slate-300 hover:shadow-md transition-all h-full">
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${colorMap[color]}`}>
         <Icon className="w-5 h-5" />
       </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500 mt-1">{label}</p>
+      <p className="font-display text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
+      <p className="text-xs text-slate-500 mt-1 leading-snug">{label}</p>
     </div>
   );
   return href ? <Link to={href}>{card}</Link> : card;
