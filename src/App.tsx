@@ -8,7 +8,6 @@ import CustomerDetailPage from "@/pages/CustomerDetailPage";
 import OpportunitiesPage from "@/pages/OpportunitiesPage";
 import NewOpportunityPage from "@/pages/NewOpportunityPage";
 import OpportunityDetailPage from "@/pages/OpportunityDetailPage";
-import SearchPage from "@/pages/SearchPage";
 import AdminUsersPage from "@/pages/AdminUsersPage";
 import AdminProductsPage from "@/pages/AdminProductsPage";
 import AdminTagsPage from "@/pages/AdminTagsPage";
@@ -45,7 +44,7 @@ export default function App() {
             <Route path="/products/vendors" element={<VendorsPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/search" element={<SearchPage />} />
+            <Route path="/search" element={<Navigate to="/dashboard#search" replace />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/products" element={<AdminProductsPage />} />
             <Route path="/admin/tags" element={<AdminTagsPage />} />

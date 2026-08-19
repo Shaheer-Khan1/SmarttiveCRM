@@ -80,8 +80,13 @@ export default function MeetingNotesPage() {
           {filtered.map((n) => (
             <Link key={n.id} to={`/meeting-notes/${n.id}`}
               className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all">
-              <h3 className="font-semibold text-gray-900 text-sm">{n.title}</h3>
-              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{n.body}</p>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-gray-900 text-sm">{n.title}</h3>
+                {n.isDraft && (
+                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">Draft</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{n.quickNotes || n.body || "No notes yet"}</p>
               <div className="flex items-center justify-between mt-3 text-[11px] text-gray-400">
                 <span>{n.meetingDate ? formatDate(n.meetingDate) : "No date"}</span>
                 <span>{n.opportunityTitle || "Standalone"}</span>

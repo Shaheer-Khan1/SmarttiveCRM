@@ -144,7 +144,7 @@ export default function OpportunityDetailPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <StatusBadge status={opp.stage} />
-              <FollowUpBadge status={followUp} />
+              {followUp !== "NO_ACTIVITY" && <FollowUpBadge status={followUp} />}
             </div>
             <h1 className="page-title break-words">{opp.title}</h1>
             <p className="text-sm text-gray-500 mt-1">

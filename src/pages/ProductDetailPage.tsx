@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Edit2, Trash2, Code, Cpu, Globe, ExternalLink, Store, User,
   FlaskConical, Upload, FileText, MessageSquare, Send, X, History, Plus, Download,
-  Gauge, Award, Grid2x2, Gavel,
+  Gauge, Award, Grid2x2, Gavel, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   getProduct, updateProduct, deleteProduct,
@@ -21,7 +21,7 @@ import {
   getPriorityColors, getPocStatusColors, POC_STATUSES, POC_STAGES, getPocStageLabel, PRODUCT_PRIORITIES,
   MATURITY_LEVELS, getMaturityLabel, getMaturityIndex, getMaturityColors,
   computeScore, getScoreColors, getCompatibilityColors, getCompatibilityLabel,
-  formatTimeAgo, formatDate,
+  formatTimeAgo, formatDate, canMoveProductStatus, getAdjacentProductStatuses,
 } from "@/lib/utils";
 import { canContributeToProduct, canEditProduct, canDeleteProduct, canDeleteRecord } from "@/lib/permissions";
 
@@ -62,6 +62,7 @@ export default function ProductDetailPage() {
   const handleStatusChange = async (status: ProductStatus) => {
     if (!product || status === product.status) return;
     if (!canEditProduct(product, profile, user?.uid)) return;
+    if (!canMoveProductStatus(product.status, status)) return;
     await updateProduct(id!, { status });
     await logActivity({
       entityType: "product", entityId: id!, action: "Changed status",
@@ -135,6 +136,11 @@ export default function ProductDetailPage() {
   const canContribute = canContributeToProduct(product, profile, user?.uid);
   const canEdit = canEditProduct(product, profile, user?.uid);
   const canDelete = canDeleteProduct(product, profile, user?.uid);
+  const adjacentStatuses = getAdjacentProductStatuses(product.status);
+  const statusHistory = logs.filter((l) => l.action === "Changed status");
+  const statusIdx = PRODUCT_STATUSES.indexOf(product.status);
+  const prevStatus = statusIdx > 0 ? PRODUCT_STATUSES[statusIdx - 1] : null;
+  const nextStatus = statusIdx >= 0 && statusIdx < PRODUCT_STATUSES.length - 1 ? PRODUCT_STATUSES[statusIdx + 1] : null;
 
   return (
     <div className="space-y-6">
@@ -190,22 +196,85 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Status workflow */}
-      {canEdit && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm flex flex-wrap items-center gap-1.5">
+      {/* Status workflow — only previous / next step */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-gray-400 px-1">Status</span>
-          {PRODUCT_STATUSES.map((s) => (
-            <button key={s} onClick={() => handleStatusChange(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${product.status === s ? getProductStatusColors(s) + " border-current" : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"}`}>
-              {getProductStatusLabel(s)}
+          {PRODUCT_STATUSES.map((s) => {
+            const isCurrent = product.status === s;
+            const isAdjacent = adjacentStatuses.includes(s);
+            const clickable = canEdit && isAdjacent;
+            return (
+              <button
+                key={s}
+                type="button"
+                disabled={!clickable}
+                onClick={() => clickable && handleStatusChange(s)}
+                title={isCurrent ? "Current status" : clickable ? "Move to this step" : "Only previous or next step allowed"}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  isCurrent
+                    ? getProductStatusColors(s) + " border-current"
+                    : clickable
+                      ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      : "bg-gray-50 text-gray-400 border-gray-100 cursor-default"
+                }`}
+              >
+                {getProductStatusLabel(s)}
+              </button>
+            );
+          })}
+          {canEdit && (
+            <button onClick={handleRecordDecision}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-900">
+              <Gavel className="w-3.5 h-3.5" /> Record Decision
             </button>
-          ))}
-          <button onClick={handleRecordDecision}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-900">
-            <Gavel className="w-3.5 h-3.5" /> Record Decision
-          </button>
+          )}
         </div>
-      )}
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!prevStatus}
+              onClick={() => prevStatus && handleStatusChange(prevStatus)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Previous
+            </button>
+            <button
+              type="button"
+              disabled={!nextStatus}
+              onClick={() => nextStatus && handleStatusChange(nextStatus)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <p className="text-[11px] text-gray-400 ml-1">Status can only move one step at a time</p>
+          </div>
+        )}
+        {statusHistory.length > 0 && (
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5" /> Status change log
+            </p>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {statusHistory.map((l) => (
+                <div key={l.id} className="text-xs bg-slate-50 rounded-lg px-3 py-2">
+                  <p className="text-gray-800">
+                    <span className="font-medium">{l.performedByName}</span>
+                    {" changed status "}
+                    {l.oldValue && l.newValue ? (
+                      <>from <span className="font-medium">{l.oldValue}</span> to <span className="font-medium">{l.newValue}</span></>
+                    ) : (
+                      <span className="font-medium">{l.newValue}</span>
+                    )}
+                  </p>
+                  <p className="text-gray-400 mt-0.5">{formatDate(l.timestamp)} · {formatTimeAgo(l.timestamp)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">

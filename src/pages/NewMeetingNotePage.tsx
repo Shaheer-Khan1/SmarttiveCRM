@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 import { createMeetingNote, type NotePermission } from "@/lib/crm";
 import { getOpportunities, getUsers, type Opportunity, type UserProfile } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -14,14 +14,17 @@ export default function NewMeetingNotePage() {
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [saving, setSaving] = useState(false);
+  const [externalInput, setExternalInput] = useState("");
   const [form, setForm] = useState({
     title: "",
     body: "",
+    quickNotes: "",
     meetingDate: "",
     nextSteps: "",
     opportunityId: params.get("opportunityId") || "",
     country: "Saudi Arabia",
     attendeeIds: [] as string[],
+    externalAttendees: [] as string[],
     inviteIds: [] as string[],
   });
 
@@ -34,9 +37,20 @@ export default function NewMeetingNotePage() {
     return <Navigate to="/meeting-notes" replace />;
   }
 
+  const addExternal = () => {
+    const name = externalInput.trim();
+    if (!name) return;
+    if (form.externalAttendees.some((x) => x.toLowerCase() === name.toLowerCase())) {
+      setExternalInput("");
+      return;
+    }
+    setForm((f) => ({ ...f, externalAttendees: [...f.externalAttendees, name] }));
+    setExternalInput("");
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.body.trim() || !user || !profile) return;
+    if (!form.title.trim() || !user || !profile) return;
     setSaving(true);
     try {
       const opp = opps.find((o) => o.id === form.opportunityId);
@@ -55,12 +69,15 @@ export default function NewMeetingNotePage() {
       const id = await createMeetingNote({
         title: form.title.trim(),
         body: form.body.trim(),
+        quickNotes: form.quickNotes.trim(),
+        isDraft: false,
         meetingDate: form.meetingDate ? new Date(form.meetingDate) : null,
         nextSteps: form.nextSteps,
         opportunityId: form.opportunityId || null,
         opportunityTitle: opp?.title || null,
         country: form.country || opp?.country || null,
         attendees,
+        externalAttendees: form.externalAttendees,
         createdById: user.uid,
         createdByName: profile.name,
         permissions,
@@ -85,8 +102,14 @@ export default function NewMeetingNotePage() {
           <input required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={inputCls} />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-700 mb-1.5 block">Body *</label>
-          <textarea required rows={5} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} className={inputCls + " resize-none"} />
+          <label className="text-xs font-medium text-gray-700 mb-1.5 block">Quick Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+          <textarea rows={2} value={form.quickNotes} onChange={(e) => setForm((f) => ({ ...f, quickNotes: e.target.value }))}
+            placeholder="Short capture / bullet points…"
+            className={inputCls + " resize-none"} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-700 mb-1.5 block">Full Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+          <textarea rows={5} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} className={inputCls + " resize-none"} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -108,7 +131,8 @@ export default function NewMeetingNotePage() {
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-700 mb-1.5 block">Attendees</label>
+          <label className="text-xs font-medium text-gray-700 mb-1.5 block">Internal Attendees</label>
+          <p className="text-[11px] text-gray-400 mb-2">Select from CRM users</p>
           <div className="flex flex-wrap gap-2">
             {users.map((u) => {
               const on = form.attendeeIds.includes(u.id);
@@ -124,6 +148,35 @@ export default function NewMeetingNotePage() {
               );
             })}
           </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-700 mb-1.5 block">External Attendees</label>
+          <p className="text-[11px] text-gray-400 mb-2">Type a name and press Add or Enter</p>
+          <div className="flex gap-2">
+            <input value={externalInput} onChange={(e) => setExternalInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addExternal(); } }}
+              placeholder="e.g. John Smith, Acme Corp"
+              className={inputCls} />
+            <button type="button" onClick={addExternal}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
+          {form.externalAttendees.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {form.externalAttendees.map((name) => (
+                <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-teal-50 text-teal-800 border border-teal-200">
+                  {name}
+                  <button type="button" onClick={() => setForm((f) => ({
+                    ...f,
+                    externalAttendees: f.externalAttendees.filter((x) => x !== name),
+                  }))} className="hover:text-teal-950">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="text-xs font-medium text-gray-700 mb-1.5 block">Invite collaborators</label>

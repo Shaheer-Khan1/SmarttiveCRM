@@ -23,7 +23,7 @@ export default function OpportunityCard({ opp }: { opp: Opportunity }) {
       </div>
 
       <div className="flex items-center gap-2 mb-3">
-        <FollowUpBadge status={followUpStatus} />
+        {followUpStatus !== "NO_ACTIVITY" && <FollowUpBadge status={followUpStatus} />}
         {opp.value != null && (
           <span className="text-xs text-gray-500">{opp.value.toLocaleString()} {opp.currency}</span>
         )}

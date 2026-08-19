@@ -404,8 +404,15 @@ export interface MeetingNote {
   id: string;
   title: string;
   body: string;
+  /** Optional short capture; required only when creating a draft from the dashboard. */
+  quickNotes?: string;
+  /** Draft notes can be opened later to fill remaining fields. */
+  isDraft?: boolean;
   meetingDate?: Date | null;
+  /** Internal attendees selected from CRM users. */
   attendees: AssignedPerson[];
+  /** Free-text external attendees (names / emails). */
+  externalAttendees: string[];
   nextSteps?: string;
   opportunityId?: string | null;
   opportunityTitle?: string | null;
@@ -452,12 +459,19 @@ export async function getMeetingNote(id: string): Promise<MeetingNote | null> {
 
 function docToMeetingNote(snap: { id: string; data: () => Record<string, unknown> }): MeetingNote {
   const d = snap.data();
+  const externalRaw = d.externalAttendees;
+  const externalAttendees = Array.isArray(externalRaw)
+    ? (externalRaw as unknown[]).map((x) => String(x)).filter(Boolean)
+    : [];
   return {
     id: snap.id,
     title: (d.title as string) || "",
     body: (d.body as string) || "",
+    quickNotes: (d.quickNotes as string) || "",
+    isDraft: !!d.isDraft,
     meetingDate: d.meetingDate ? toDate(d.meetingDate as Timestamp) : null,
     attendees: Array.isArray(d.attendees) ? (d.attendees as AssignedPerson[]) : [],
+    externalAttendees,
     nextSteps: (d.nextSteps as string) || "",
     opportunityId: (d.opportunityId as string) || null,
     opportunityTitle: (d.opportunityTitle as string) || null,
@@ -475,11 +489,15 @@ export async function createMeetingNote(
 ): Promise<string> {
   const ref = await addDoc(collection(db, "meeting_notes"), {
     ...data,
+    quickNotes: data.quickNotes || "",
+    isDraft: !!data.isDraft,
+    externalAttendees: data.externalAttendees || [],
+    attendees: data.attendees || [],
     meetingDate: data.meetingDate ? Timestamp.fromDate(data.meetingDate) : null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  if (data.opportunityId) {
+  if (data.opportunityId && !data.isDraft) {
     await logOpportunityEvent(data.opportunityId, {
       type: "MEETING_ADDED",
       message: `Meeting note "${data.title}" added`,

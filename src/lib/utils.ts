@@ -237,6 +237,21 @@ export const PRODUCT_STATUSES: ProductStatus[] = [
   "RESEARCH_STARTED", "IN_PROGRESS", "POC_ONGOING", "UNDER_REVIEW", "APPROVED", "REJECTED", "INTEGRATED",
 ];
 
+/** Status may only move one step forward or backward in PRODUCT_STATUSES. */
+export function getAdjacentProductStatuses(current: ProductStatus): ProductStatus[] {
+  const idx = PRODUCT_STATUSES.indexOf(current);
+  if (idx < 0) return PRODUCT_STATUSES.slice(0, 1);
+  const next: ProductStatus[] = [];
+  if (idx > 0) next.push(PRODUCT_STATUSES[idx - 1]);
+  if (idx < PRODUCT_STATUSES.length - 1) next.push(PRODUCT_STATUSES[idx + 1]);
+  return next;
+}
+
+export function canMoveProductStatus(from: ProductStatus, to: ProductStatus): boolean {
+  if (from === to) return true;
+  return getAdjacentProductStatuses(from).includes(to);
+}
+
 export function getProductStatusLabel(status: ProductStatus): string {
   const labels: Record<ProductStatus, string> = {
     RESEARCH_STARTED: "Research Started",

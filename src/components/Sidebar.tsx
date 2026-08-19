@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Building2, Target, Search, Calendar, Package, Bell,
+  LayoutDashboard, Building2, Target, Calendar, Package, Bell,
   Users, LogOut, TrendingUp, ChevronRight, StickyNote, Tags, Palette, X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -14,7 +14,6 @@ const navItems = [
   { to: "/meeting-notes", label: "Meeting Notes", icon: StickyNote },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/products", label: "Research", icon: Package },
-  { to: "/search", label: "Search", icon: Search },
 ];
 
 interface Props {
