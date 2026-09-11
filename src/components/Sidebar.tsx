@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Building2, Target, Calendar, Package, Bell,
-  Users, LogOut, TrendingUp, ChevronRight, StickyNote, Tags, Palette, X,
+  Users, LogOut, TrendingUp, ChevronRight, StickyNote, Tags, Palette, X, Columns3,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getNotifications } from "@/lib/firestore";
@@ -10,6 +10,7 @@ import { canManageCrmData, canManageUsers } from "@/lib/permissions";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/workspace", label: "Workspace", icon: Columns3 },
   { to: "/customers", label: "Customers", icon: Building2 },
   { to: "/opportunities", label: "Opportunities", icon: Target },
   { to: "/meeting-notes", label: "Meeting Notes", icon: StickyNote },

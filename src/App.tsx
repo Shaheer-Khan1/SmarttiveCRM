@@ -8,6 +8,7 @@ import CustomerDetailPage from "@/pages/CustomerDetailPage";
 import OpportunitiesPage from "@/pages/OpportunitiesPage";
 import NewOpportunityPage from "@/pages/NewOpportunityPage";
 import OpportunityDetailPage from "@/pages/OpportunityDetailPage";
+import OpportunityWorkspacePage from "@/pages/OpportunityWorkspacePage";
 import AdminUsersPage from "@/pages/AdminUsersPage";
 import AdminProductsPage from "@/pages/AdminProductsPage";
 import AdminTagsPage from "@/pages/AdminTagsPage";
@@ -30,6 +31,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/workspace" element={<OpportunityWorkspacePage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:id" element={<CustomerDetailPage />} />
             <Route path="/opportunities" element={<OpportunitiesPage />} />

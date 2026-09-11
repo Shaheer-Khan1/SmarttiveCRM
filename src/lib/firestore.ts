@@ -74,6 +74,8 @@ export interface Opportunity {
   initiatedById?: string;
   initiatedByName?: string;
   lastActivityDate?: Date | null;
+  /** Exit checklist for current stage (workspace). */
+  stageGates?: { id: string; text: string; done: boolean; ownerLabel: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -323,6 +325,9 @@ function docToOpportunity(snap: { id: string; data: () => Record<string, unknown
     initiatedById: d.initiatedById as string | undefined,
     initiatedByName: d.initiatedByName as string | undefined,
     lastActivityDate: d.lastActivityDate ? toDate(d.lastActivityDate as Timestamp) : null,
+    stageGates: Array.isArray(d.stageGates)
+      ? (d.stageGates as Opportunity["stageGates"])
+      : [],
     createdAt: toDate(d.createdAt as Timestamp),
     updatedAt: toDate(d.updatedAt as Timestamp),
   };

@@ -1,0 +1,1049 @@
+<title>Opportunity Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#E9EEEF; --surface:#FFFFFF; --surface-2:#F3F6F7; --surface-3:#EAF0F1;
+  --line:#D3DCDE; --line-soft:#E3EAEB;
+  --ink:#0E1A1F; --ink-2:#3E5057; --ink-3:#6D8188;
+  --accent:#0A6E74; --accent-soft:#DBECEC; --accent-line:#9CCBCC; --on-accent:#FFFFFF;
+  --warm:#AF5A05; --warm-soft:#FAEAD9; --warm-line:#E7C39A;
+  --good:#2C7A51; --good-soft:#DDEFE5;
+  --warn:#A96B00; --warn-soft:#F8EBD2;
+  --crit:#A92C22; --crit-soft:#F9E2DF; --crit-line:#E8B4AE;
+  --shadow-1:0 1px 2px rgba(14,26,31,.07);
+  --shadow-2:0 1px 2px rgba(14,26,31,.06), 0 6px 18px rgba(14,26,31,.07);
+  --shadow-3:0 10px 40px rgba(14,26,31,.18);
+  --r-s:5px; --r-m:9px; --r-l:14px;
+  --sans:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --display:"Archivo", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0A1114; --surface:#111C20; --surface-2:#162328; --surface-3:#1B2A30;
+    --line:#26363C; --line-soft:#1C2A30;
+    --ink:#E5EDEE; --ink-2:#A8BCC1; --ink-3:#7A9098;
+    --accent:#4FB3B8; --accent-soft:#113438; --accent-line:#2A5F63; --on-accent:#04191B;
+    --warm:#DE944D; --warm-soft:#33240F; --warm-line:#5C4423;
+    --good:#5FBE8C; --good-soft:#14301F;
+    --warn:#D6A24E; --warn-soft:#332510;
+    --crit:#E58076; --crit-soft:#391917; --crit-line:#6B302B;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);
+    --shadow-2:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+    --shadow-3:0 10px 44px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0A1114; --surface:#111C20; --surface-2:#162328; --surface-3:#1B2A30;
+  --line:#26363C; --line-soft:#1C2A30;
+  --ink:#E5EDEE; --ink-2:#A8BCC1; --ink-3:#7A9098;
+  --accent:#4FB3B8; --accent-soft:#113438; --accent-line:#2A5F63; --on-accent:#04191B;
+  --warm:#DE944D; --warm-soft:#33240F; --warm-line:#5C4423;
+  --good:#5FBE8C; --good-soft:#14301F;
+  --warn:#D6A24E; --warn-soft:#332510;
+  --crit:#E58076; --crit-soft:#391917; --crit-line:#6B302B;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+  --shadow-3:0 10px 44px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+
+/* ---------- shell ---------- */
+.app{display:flex;flex-direction:column;height:100svh;min-height:560px;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 16px;height:54px;flex:0 0 auto;
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:9px;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.01em}
+.brand .dot{width:9px;height:9px;border-radius:2px;background:var(--accent);transform:translateY(-1px)}
+.brand small{font-family:var(--mono);font-weight:400;font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.topbar .spacer{flex:1}
+
+.seg{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m);padding:2px;gap:2px}
+.seg button{padding:5px 11px;border-radius:6px;font-size:12.5px;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-1)}
+.field{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3)}
+.field select,.field input{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:5px 8px;font-size:12.5px;color:var(--ink)}
+.ghost-btn{border:1px solid var(--line);border-radius:var(--r-s);padding:5px 10px;font-size:12.5px;color:var(--ink-2);background:var(--surface)}
+.ghost-btn:hover{border-color:var(--accent-line);color:var(--ink)}
+.solid-btn{background:var(--accent);color:var(--on-accent);border-radius:var(--r-s);padding:6px 12px;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.solid-btn:hover{filter:brightness(1.08)}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* ---------- rail ---------- */
+.rail{flex:0 0 252px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.rail-head{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.rail-filter{padding:0 10px 10px;display:flex;gap:4px;flex-wrap:wrap}
+.mini-chip{font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink-2);background:var(--surface)}
+.mini-chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+.rail-list{overflow-y:auto;padding:0 8px 14px;display:flex;flex-direction:column;gap:3px}
+.opp-item{display:grid;grid-template-columns:4px 1fr;gap:9px;padding:9px 10px 9px 8px;border-radius:var(--r-m);text-align:left;border:1px solid transparent}
+.opp-item:hover{background:var(--surface-2)}
+.opp-item[aria-current="true"]{background:var(--accent-soft);border-color:var(--accent-line)}
+.opp-item .bar{border-radius:3px;background:var(--good)}
+.opp-item.risk .bar{background:var(--warn)}
+.opp-item.hot .bar{background:var(--crit)}
+.opp-item > span:last-child{min-width:0;display:block}
+.opp-item .name{display:block;font-weight:600;font-size:13px;letter-spacing:-.005em;line-height:1.3}
+.opp-item .sub{font-size:11.5px;color:var(--ink-3);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.opp-item .sub b{font-family:var(--mono);font-weight:500;color:var(--ink-2)}
+.od-badge{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:20px;background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit-line)}
+
+/* ---------- work area ---------- */
+.work{flex:1;display:grid;grid-template-columns:minmax(330px,400px) 1fr;min-width:0;min-height:0}
+.work[data-mode="focus"]{grid-template-columns:1fr}
+.work[data-mode="focus"] .spine{display:none}
+
+.spine{border-right:1px solid var(--line);background:var(--surface);overflow-y:auto;min-width:0;
+  padding:16px 18px 28px;display:flex;flex-direction:column;gap:18px}
+.stream{overflow-y:auto;min-width:0;display:flex;flex-direction:column}
+
+/* ---------- spine blocks ---------- */
+.opp-title{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.2;letter-spacing:-.02em;text-wrap:balance;margin:0}
+.opp-meta{margin-top:6px;font-size:12.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center}
+.tag{font-size:11px;padding:2px 7px;border-radius:4px;background:var(--surface-3);color:var(--ink-2);border:1px solid var(--line-soft)}
+.tag.accent{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+
+.pipe{display:flex;gap:3px}
+.pipe .step{flex:1;text-align:left;padding-top:6px;border-top:3px solid var(--line)}
+.pipe .step .lbl{font-size:10px;font-family:var(--mono);letter-spacing:.03em;color:var(--ink-3);display:block;line-height:1.25}
+.pipe .step.done{border-top-color:var(--accent-line)}
+.pipe .step.done .lbl{color:var(--ink-2)}
+.pipe .step.now{border-top-color:var(--accent)}
+.pipe .step.now .lbl{color:var(--accent);font-weight:500}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:14px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.card-h h3{margin:0;font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:11px 14px}
+.fact .k{font-size:10.5px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+.fact .v{font-size:13.5px;font-weight:500;margin-top:1px;font-variant-numeric:tabular-nums}
+.fact .v.num{font-family:var(--mono)}
+
+.people{display:flex;flex-direction:column;gap:7px}
+.person{display:flex;align-items:center;gap:9px}
+.av{width:26px;height:26px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  font-family:var(--mono);font-size:10.5px;font-weight:500;background:var(--surface-3);color:var(--ink-2);border:1px solid var(--line-soft)}
+.av.own{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.av.sm{width:21px;height:21px;font-size:9px}
+.avstack{display:flex}
+.avstack .av.sm+.av.sm{margin-left:-7px}
+.person .who{font-size:13px;font-weight:500;line-height:1.2}
+.person .role{font-size:11px;color:var(--ink-3)}
+.person .scope{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--ink-3);border:1px solid var(--line-soft);padding:1px 5px;border-radius:4px}
+
+.gate{display:flex;flex-direction:column;gap:2px}
+.gate-row{display:flex;align-items:flex-start;gap:9px;padding:6px 2px;border-bottom:1px solid var(--line-soft);text-align:left;width:100%}
+.gate-row:last-child{border-bottom:none}
+.box{width:15px;height:15px;flex:0 0 auto;margin-top:1px;border-radius:4px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;color:transparent}
+.gate-row.on .box{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.gate-row .txt{font-size:12.5px;line-height:1.35}
+.gate-row.on .txt{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--line)}
+.gate-row .owner{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--ink-3)}
+.meter{height:4px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+
+/* ---------- stream ---------- */
+.tabs{display:flex;gap:2px;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex:0 0 auto;overflow-x:auto;align-items:center}
+.tab{padding:12px 12px 10px;font-size:13px;font-weight:500;color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .count{font-family:var(--mono);font-size:10.5px;background:var(--surface-3);color:var(--ink-3);padding:1px 5px;border-radius:20px}
+.tab[aria-selected="true"] .count{background:var(--accent-soft);color:var(--accent)}
+.tab .count.alert{background:var(--crit-soft);color:var(--crit)}
+.tabs .newtask{margin-left:auto;margin-right:2px}
+
+.filterbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;
+  background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:41px;z-index:4}
+.search{flex:1;min-width:150px;display:flex;align-items:center;gap:7px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:var(--r-m);padding:5px 10px}
+.search input{flex:1;min-width:0;border:none;background:none;outline:none;font-size:13px}
+.search svg{flex:0 0 auto;color:var(--ink-3)}
+.chip{font-size:11.5px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--accent-line)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);font-weight:500}
+.chip .sw{width:7px;height:7px;border-radius:2px}
+.clearfx{font-size:11.5px;color:var(--ink-3);text-decoration:underline;text-underline-offset:2px}
+
+.pane{padding:16px;display:flex;flex-direction:column;gap:12px}
+.pane-note{font-size:12px;color:var(--ink-3);display:flex;gap:7px;align-items:baseline}
+
+/* ---------- attention band (Pulse) ---------- */
+.attn{border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--surface)}
+.attn.urgent{border-color:var(--crit-line)}
+.attn-h{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--surface-2);border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.attn.urgent .attn-h{background:var(--crit-soft);border-bottom-color:var(--crit-line)}
+.attn-h .lead{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.attn.urgent .attn-h .lead{color:var(--crit)}
+.attn-h .split{flex:1}
+.tally{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:11px}
+.tally span{padding:1px 7px;border-radius:20px}
+.tally .od{background:var(--crit);color:#fff}
+.tally .dt{background:var(--warm);color:#fff}
+.tally .up{background:var(--surface-3);color:var(--ink-2)}
+.attn-list{display:flex;flex-direction:column}
+.arow{display:grid;grid-template-columns:3px auto 1fr auto;gap:0 10px;align-items:center;padding:9px 13px 9px 0;
+  border-bottom:1px solid var(--line-soft);text-align:left;width:100%}
+.arow:last-child{border-bottom:none}
+.arow:hover{background:var(--surface-2)}
+.arow .stripe{align-self:stretch;background:var(--line)}
+.arow.over .stripe{background:var(--crit)}
+.arow.today .stripe{background:var(--warm)}
+.arow.soon .stripe{background:var(--warn-soft)}
+.arow.over{background:var(--crit-soft)}
+.arow.over:hover{filter:brightness(.99)}
+.arow .t{font-size:13px;font-weight:500;line-height:1.3}
+.arow .m{font-size:11.5px;color:var(--ink-3);margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.arow .rt{display:flex;align-items:center;gap:8px;justify-self:end}
+.whenpill{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;white-space:nowrap;
+  background:var(--surface-3);color:var(--ink-2);border:1px solid var(--line-soft)}
+.whenpill.over{background:var(--crit);color:#fff;border-color:transparent;font-weight:500}
+.whenpill.today{background:var(--warm);color:#fff;border-color:transparent;font-weight:500}
+.whenpill.soon{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+
+/* timeline */
+.tl{display:flex;flex-direction:column}
+.ev{display:grid;grid-template-columns:60px 22px 1fr;gap:0 12px;padding-bottom:14px}
+.ev .when{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:right;padding-top:6px;line-height:1.3}
+.ev .when em{display:block;font-style:normal;font-size:10px;opacity:.75}
+.ev .spinecol{display:flex;flex-direction:column;align-items:center}
+.ev .knob{width:22px;height:22px;border-radius:7px;margin-top:3px;display:grid;place-items:center;font-size:11px;flex:0 0 auto;border:1px solid var(--line)}
+.ev .rule{flex:1;width:1px;background:var(--line);margin-top:4px}
+.ev:last-child .rule{background:linear-gradient(var(--line),transparent)}
+.ev .body{min-width:0}
+.ev .hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ev .ttl{font-weight:600;font-size:13.5px;letter-spacing:-.005em}
+.ev .by{font-size:11.5px;color:var(--ink-3)}
+.ev .txt{font-size:13px;color:var(--ink-2);margin-top:3px;line-height:1.5;max-width:68ch}
+.ev .attach{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:11px;font-family:var(--mono);padding:2px 7px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line-soft);color:var(--ink-2)}
+.pill.q{background:var(--warm-soft);border-color:var(--warm-line);color:var(--warm)}
+.pill.bad{background:var(--crit-soft);border-color:var(--crit-line);color:var(--crit)}
+
+.k-minute{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.k-update{background:var(--surface-2);color:var(--ink-2)}
+.k-task{background:var(--warm-soft);color:var(--warm);border-color:var(--warm-line)}
+.k-poc{background:var(--good-soft);color:var(--good);border-color:transparent}
+.k-stage{background:var(--ink);color:var(--surface);border-color:transparent}
+.k-comm{background:var(--surface-3);color:var(--ink-2)}
+
+/* tasks */
+.lane{display:flex;flex-direction:column;gap:8px}
+.lane-h{display:flex;align-items:center;gap:8px;margin-top:4px}
+.lane-h h4{margin:0;font-family:var(--display);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.lane-h .line{flex:1;height:1px;background:var(--line)}
+.task{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--surface);
+  border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--r-m);padding:9px 12px}
+.task:hover{box-shadow:var(--shadow-1)}
+.task.s-doing{border-left-color:var(--accent)}
+.task.s-blocked{border-left-color:var(--crit)}
+.task.s-done{border-left-color:var(--good);opacity:.6}
+.task.overdue{border-color:var(--crit-line);border-left-color:var(--crit);background:var(--crit-soft)}
+.task .t{font-size:13px;font-weight:500;line-height:1.3}
+.task .m{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.task .right{display:flex;align-items:center;gap:9px}
+.status{font-size:10.5px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px}
+.s-todo .status{background:var(--surface-3);color:var(--ink-3)}
+.s-doing .status{background:var(--accent-soft);color:var(--accent)}
+.s-blocked .status{background:var(--crit-soft);color:var(--crit)}
+.s-done .status{background:var(--good-soft);color:var(--good)}
+
+/* poc */
+.poc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-m);padding:11px 12px}
+.kpi .k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.kpi .v{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:12px;font-weight:500;color:var(--ink-3);font-family:var(--sans)}
+.kpi .d{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.finding{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+.finding:last-child{border-bottom:none}
+.dotmark{width:8px;height:8px;border-radius:50%;margin-top:6px}
+.finding .h{font-size:13px;font-weight:600}
+.finding .b{font-size:12.5px;color:var(--ink-2);margin-top:2px;max-width:66ch}
+.finding .meta{font-size:11px;color:var(--ink-3);margin-top:4px;font-family:var(--mono)}
+
+/* calendar */
+.cal-head{display:flex;align-items:center;gap:10px;margin-bottom:2px;flex-wrap:wrap}
+.cal-head h3{margin:0;font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:-.01em}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--line-soft);gap:1px}
+.cal .dow{background:var(--surface-2);padding:7px 8px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);text-align:left}
+.day{background:var(--surface);min-height:92px;padding:6px 7px;text-align:left;display:flex;flex-direction:column;gap:3px;align-items:stretch}
+.day.pad{background:var(--surface-2)}
+.day:hover{background:var(--surface-2)}
+.day[aria-pressed="true"]{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.day.hasover{box-shadow:inset 3px 0 0 var(--crit)}
+.day .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;align-self:flex-start}
+.day.today .n{background:var(--ink);color:var(--surface);border-radius:20px;padding:0 5px}
+.day .ec{font-size:10.5px;line-height:1.3;padding:2px 5px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid transparent}
+.ec-over{background:var(--crit);color:#fff;font-weight:500}
+.ec-due{background:var(--warm-soft);color:var(--warm);border-color:var(--warm-line)}
+.ec-donetask{background:var(--good-soft);color:var(--good)}
+.day .more{font-size:10px;color:var(--ink-3);font-family:var(--mono)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.legend span.swx{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.empty{padding:34px 16px;text-align:center;color:var(--ink-3);font-size:13px}
+
+/* overlays */
+.overlay{position:fixed;inset:0;background:rgba(8,16,19,.42);display:none;z-index:40}
+.overlay[data-open="true"]{display:block}
+.sheet{position:absolute;right:0;top:0;bottom:0;width:min(460px,92vw);background:var(--surface);
+  border-left:1px solid var(--line);overflow-y:auto;padding:22px 22px 40px;display:flex;flex-direction:column;gap:16px}
+.sheet h2{font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:-.02em;margin:0}
+.sheet h4{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+.sheet p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.55;max-width:62ch}
+.sheet section{border-top:1px solid var(--line-soft);padding-top:14px}
+
+.dialog{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,94vw);max-height:92svh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--shadow-3);padding:20px 22px 18px;
+  display:flex;flex-direction:column;gap:14px}
+.dialog h2{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:-.02em;margin:0}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.f input[type="text"],.f input[type="date"],.f select{width:100%;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:var(--r-s);padding:8px 10px;font-size:13.5px;outline:none}
+.f input:focus,.f select:focus{border-color:var(--accent);background:var(--surface)}
+.picker{display:flex;flex-wrap:wrap;gap:5px}
+.pk{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 9px 4px 4px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2)}
+.pk[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);font-weight:500}
+.pkgroup{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin:8px 0 5px}
+.checkline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--line-soft);padding-top:13px;margin-top:2px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--surface);
+  padding:9px 16px;border-radius:20px;font-size:13px;z-index:60;box-shadow:var(--shadow-3);display:none}
+.toast[data-show="true"]{display:block}
+
+@media (max-width:1080px){
+  .app{height:auto;min-height:0;overflow:visible}
+  .body{flex-direction:column}
+  .rail{flex:0 0 auto;border-right:none;border-bottom:1px solid var(--line)}
+  .rail-list{flex-direction:row;overflow-x:auto;padding:0 10px 12px}
+  .opp-item{flex:0 0 218px}
+  .work{grid-template-columns:1fr}
+  .spine{border-right:none;border-bottom:1px solid var(--line)}
+  .tabs,.filterbar{position:static}
+}
+@media (max-width:560px){
+  .ev{grid-template-columns:0 20px 1fr;gap:0 10px}
+  .ev .when{display:none}
+  .facts{grid-template-columns:1fr}
+  .frow{grid-template-columns:1fr}
+  .day{min-height:64px}
+  .day .ec,.day .more{display:none}
+  .arow{grid-template-columns:3px auto 1fr;row-gap:6px}
+  .arow .rt{grid-column:2/-1;justify-self:start}
+}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>Pipeline<small>opportunity workspace</small></div>
+    <span class="spacer"></span>
+    <label class="field" for="roleSel">Viewing as
+      <select id="roleSel">
+        <option value="owner">Owner / Co-owner</option>
+        <option value="comms">Communications coordinator</option>
+        <option value="tech">Technical team</option>
+        <option value="dev">Development</option>
+      </select>
+    </label>
+    <div class="seg" role="group" aria-label="Layout">
+      <button id="mSplit" aria-pressed="true">Split</button>
+      <button id="mFocus" aria-pressed="false">Focus</button>
+    </div>
+    <button class="ghost-btn" id="openNotes">Design notes</button>
+  </header>
+
+  <div class="body">
+    <nav class="rail" aria-label="Opportunities">
+      <div class="rail-head">
+        <span class="eyebrow">Open opportunities</span>
+        <span class="eyebrow" id="oppCount">5</span>
+      </div>
+      <div class="rail-filter" id="railFilter"></div>
+      <div class="rail-list" id="railList"></div>
+    </nav>
+
+    <main class="work" data-mode="split" id="work">
+      <section class="spine" id="spine" aria-label="Opportunity detail"></section>
+      <section class="stream" aria-label="Activity workspace">
+        <div class="tabs" role="tablist" id="tabs"></div>
+        <div id="filterbar" class="filterbar"></div>
+        <div id="paneHost"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- new task dialog -->
+<div class="overlay" id="taskOverlay" data-open="false">
+  <form class="dialog" id="taskForm" role="dialog" aria-label="New task">
+    <h2>New task</h2>
+    <div class="f">
+      <label for="tTitle">Task</label>
+      <input type="text" id="tTitle" required placeholder="e.g. Re-run bitrate test on camera class B">
+    </div>
+    <div class="frow">
+      <div class="f"><label for="tWho">Responsible</label><select id="tWho"></select></div>
+      <div class="f"><label for="tDue">Due date</label><input type="date" id="tDue"></div>
+    </div>
+    <div class="f">
+      <label>Assisted by</label>
+      <div id="tAssist"></div>
+    </div>
+    <div class="frow">
+      <div class="f"><label for="tLane">Lane</label>
+        <select id="tLane"><option>Sales</option><option>Technical</option><option>Development</option></select></div>
+      <div class="f"><label for="tSrc">Origin</label>
+        <select id="tSrc"><option value="internal">Internal</option><option value="customer">Raised by customer</option></select></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="ghost-btn" id="tCancel">Cancel</button>
+      <button type="submit" class="solid-btn">Create task</button>
+    </div>
+  </form>
+</div>
+
+<div class="overlay" id="notes" data-open="false">
+  <div class="sheet" role="dialog" aria-label="Design notes">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <h2>Why it's built this way</h2>
+      <button class="ghost-btn" id="closeNotes">Close</button>
+    </div>
+    <p>Seven decisions behind this prototype. Everything on screen is sample data.</p>
+    <section><h4>1 · One stream, many types</h4>
+      <p>Minutes, progress notes, tasks, PoC findings and stage changes are all events on a single opportunity timeline, each typed. Filtering by type gives you the tab view back on demand — the reverse doesn't work.</p></section>
+    <section><h4>2 · Due and overdue sit at the top of Pulse</h4>
+      <p>The stream opens with what is late and what lands this week, before any history. Overdue items are the only thing on the page allowed to use full-strength red — that's what makes them register.</p></section>
+    <section><h4>3 · Tasks are created inline, from anywhere</h4>
+      <p>Every task has one <em>responsible</em> person — normally the owner, co-owner or coordinator — plus any number of <em>assisting</em> team members picked from the user list. The responsible person answers for the date; assistants do the work and post updates.</p></section>
+    <section><h4>4 · Stage gates, not stage guesses</h4>
+      <p>Each stage carries a short exit checklist with a named owner, so progress reporting is a by-product of the work rather than a weekly chase.</p></section>
+    <section><h4>5 · Two tiers of access</h4>
+      <p>Owner, co-owner and communications coordinator are opportunity members with full read/write. Technical and development people are work assignees — they see the context and their own items, and post into the same stream without being CRM users.</p></section>
+    <section><h4>6 · The PoC is its own record</h4>
+      <p>Baseline, environment, measured results, dated feedback, blockers and a report. Sales quotes from the same numbers the engineer measured.</p></section>
+    <section><h4>7 · Calendar and stream are one view</h4>
+      <p>Task due dates and activity share the month grid; clicking a day filters the stream to it. Overdue days are marked on the left edge so a bad week is visible before you read a single entry.</p></section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- people ---------------- */
+const P = {
+  ali:{n:"Ali S.",      i:"AS", g:"comm", r:"Commercial"},
+  saif:{n:"Saif A.",    i:"SA", g:"comm", r:"Commercial"},
+  tim:{n:"Tim A.",      i:"TA", g:"comm", r:"Commercial"},
+  yas:{n:"Yasmeen A.",  i:"YA", g:"comm", r:"Commercial"},
+  mishal:{n:"Mishal A.",i:"MA", g:"tech", r:"Technical"},
+  shaheer:{n:"Shaheer K.",i:"SK", g:"tech", r:"Technical"},
+  abdullah:{n:"Abdullah K.",i:"AK", g:"tech", r:"Technical"},
+  saifullah:{n:"Saifullah R.",i:"SR", g:"tech", r:"Technical"},
+  talha:{n:"Talha Q.",  i:"TQ", g:"tech", r:"Technical"}
+};
+const COMMERCIAL = ["ali","saif","tim","yas"];
+const TECHNICAL = ["mishal","shaheer","abdullah","saifullah","talha"];
+
+const STAGES = ["Introduction","POC","Quotation","Negotiation","Closed"];
+const TYPES = [
+  {id:"minute", label:"Minutes",  icon:"M", cls:"k-minute"},
+  {id:"update", label:"Progress", icon:"P", cls:"k-update"},
+  {id:"task",   label:"Tasks",    icon:"T", cls:"k-task"},
+  {id:"poc",    label:"PoC",      icon:"L", cls:"k-poc"},
+  {id:"comm",   label:"Comms",    icon:"C", cls:"k-comm"},
+  {id:"stage",  label:"Stage",    icon:"S", cls:"k-stage"}
+];
+const TYPE = Object.fromEntries(TYPES.map(t=>[t.id,t]));
+const TODAY = "2026-09-11";
+
+/* ---------------- opportunities ---------------- */
+const OPPS = [
+  {
+    id:"qth", name:"Qiddiya NW Transport Hub", customer:"Egis / Qiddiya Investment Co.",
+    stage:1, health:"risk", value:"1.42M", cur:"SAR", close:"2026-11-30", product:"OrcaStream Edge",
+    cams:"2,480 cameras · 41 sites", nextStep:"PoC report due to Egis", nextDate:"2026-09-18",
+    team:{owner:"ali",co:"saif",comms:"yas",tech:"mishal",dev:["shaheer","abdullah"]},
+    gates:[
+      {t:"AVIT spec clauses mapped to OrcaStream capability",on:true,o:"MA"},
+      {t:"PoC environment signed off by consultant",on:true,o:"AS"},
+      {t:"Measured bitrate savings across 3 camera classes",on:true,o:"MA"},
+      {t:"PoC report issued and acknowledged",on:false,o:"MA"},
+      {t:"Storage/retention model agreed with client IT",on:false,o:"SA"}
+    ],
+    poc:{
+      window:"18 Aug – 18 Sep 2026", site:"Hub North gatehouse + P2 deck",
+      kpis:[
+        {k:"Bitrate reduction",v:"58",u:"%",d:"vs H.265 baseline, 24h mixed scene"},
+        {k:"Storage saved",v:"312",u:"TB/yr",d:"at 30-day retention, 2,480 cams"},
+        {k:"Motion latency",v:"140",u:"ms",d:"target < 200 ms"},
+        {k:"VMS compatibility",v:"3 / 3",u:"",d:"Milestone, Genetec, Nx tested"}
+      ],
+      findings:[
+        {k:"good",h:"Night scenes exceeded target",b:"Low-light parking decks reached 64% reduction — better than the 45% committed in the proposal. Consultant asked for the raw clips.",m:"Mishal A. · 03 Sep"},
+        {k:"warn",h:"Mini-PC thermals at gatehouse",b:"Edge unit throttled twice above 46°C ambient. Fan-less enclosure spec needs revising before rollout pricing.",m:"Shaheer K. · 05 Sep"},
+        {k:"crit",h:"Genetec archiver plugin version",b:"Client runs an archiver build two versions behind our tested plugin. Blocking sign-off until they schedule the upgrade window.",m:"Abdullah K. · 08 Sep"},
+        {k:"good",h:"Operator acceptance",b:"Control room staff could not distinguish compressed from source on the 3x3 wall in a blind comparison.",m:"Mishal A. · 09 Sep"}
+      ]
+    },
+    tasks:[
+      {t:"Produce PoC report with raw clip appendix",lane:"Technical",who:"ali",assist:["mishal","talha"],due:"2026-09-16",s:"doing",src:"customer"},
+      {t:"Re-test Genetec plugin against archiver 5.11",lane:"Development",who:"saif",assist:["abdullah"],due:"2026-09-09",s:"blocked",src:"customer"},
+      {t:"Fan-less enclosure spec + revised BoM",lane:"Development",who:"ali",assist:["shaheer"],due:"2026-09-22",s:"todo",src:"internal"},
+      {t:"Storage model for 30/60/90-day retention",lane:"Sales",who:"saif",assist:["saifullah"],due:"2026-09-11",s:"doing",src:"customer"},
+      {t:"Circulate PoC summary to Egis distribution list",lane:"Sales",who:"yas",assist:[],due:"2026-09-18",s:"todo",src:"internal"},
+      {t:"Collate raw night-scene clips for appendix",lane:"Technical",who:"ali",assist:["talha","mishal"],due:"2026-09-10",s:"doing",src:"customer"},
+      {t:"Map AVIT clause 14.3 to compression capability",lane:"Technical",who:"ali",assist:["mishal"],due:"2026-09-04",s:"done",src:"internal"}
+    ],
+    events:[
+      {d:"2026-09-10T11:00",ty:"minute",ti:"PoC review call — Egis + QIC operations",by:"yas",
+       b:"Consultant accepted the night-scene results and asked for raw clips as an appendix. QIC IT confirmed the archiver upgrade window is unscheduled. Agreed: report issued by 18 Sep, pricing conversation only after sign-off.",
+       at:["Attendees ×6","Minutes approved by Ali S.","2 actions raised"]},
+      {d:"2026-09-09T16:20",ty:"poc",ti:"Blind wall comparison passed",by:"mishal",
+       b:"Control room staff could not pick the compressed feed on the 3x3 wall. Recorded in the PoC findings as operator acceptance.",at:["Finding · good"]},
+      {d:"2026-09-08T09:05",ty:"task",ti:"Task blocked — Genetec archiver version",by:"abdullah",
+       b:"Client archiver build 5.9 is two behind our tested plugin. Cannot certify until they upgrade. Flagged to the owner.",at:["Blocked","Raised by customer"]},
+      {d:"2026-09-07T08:40",ty:"update",ti:"Weekly progress",by:"ali",
+       b:"Three of five stage gates closed. Main risk remains the archiver version on the client side — everything else is on track for an 18 Sep report.",at:["Week 37"]},
+      {d:"2026-09-05T14:30",ty:"poc",ti:"Thermal throttling at gatehouse unit",by:"shaheer",
+       b:"Edge mini-PC throttled twice above 46°C ambient. Needs a fan-less enclosure before we price the rollout.",at:["Finding · watch"]},
+      {d:"2026-09-03T10:15",ty:"poc",ti:"Night-scene results — 64% reduction",by:"mishal",
+       b:"Low-light parking decks beat the 45% committed in the proposal. Raw clips archived for the report appendix.",at:["Finding · good","4 clips"]},
+      {d:"2026-09-01T09:00",ty:"comm",ti:"PoC extension confirmed in writing",by:"yas",
+       b:"Egis confirmed the PoC window extends to 18 Sep to cover the second camera class.",at:["Email thread"]},
+      {d:"2026-08-18T09:00",ty:"stage",ti:"Moved to POC",by:"ali",
+       b:"Introduction gates closed. PoC kicked off at Hub North gatehouse and P2 deck.",at:["Introduction → POC"]}
+    ]
+  },
+  {
+    id:"eviq", name:"EVIQ charging network — remote monitoring", customer:"EVIQ",
+    stage:2, health:"ok", value:"860K", cur:"SAR", close:"2026-10-20", product:"OrcaStream Edge",
+    cams:"1,150 cameras · 230 sites", nextStep:"Quotation revision 2 to procurement", nextDate:"2026-09-15",
+    team:{owner:"saif",co:"ali",comms:"yas",tech:"saifullah",dev:["shaheer"]},
+    gates:[
+      {t:"5G bandwidth envelope agreed per site",on:true,o:"SR"},
+      {t:"PoC at two pilot charging sites complete",on:true,o:"SR"},
+      {t:"Quotation rev 2 issued",on:false,o:"SA"},
+      {t:"SIM/data cost model validated with operator",on:false,o:"AS"}
+    ],
+    poc:{window:"12 Jul – 20 Aug 2026", site:"Riyadh North & Dammam Corniche chargers",
+      kpis:[
+        {k:"Uplink reduction",v:"71",u:"%",d:"critical on metered 5G"},
+        {k:"Data cost / site",v:"-64",u:"%",d:"per month, operator tariff"},
+        {k:"Uptime during PoC",v:"99.4",u:"%",d:"39-day window"},
+        {k:"Sites piloted",v:"2 / 2",u:"",d:"both passed"}
+      ],
+      findings:[
+        {k:"good",h:"Metered 5G cost is the winning argument",b:"Uplink reduction translates directly to tariff savings — procurement responded to the cost model faster than the technical results.",m:"Saif A. · 22 Aug"},
+        {k:"warn",h:"Site power interruptions",b:"Charger cabinets lose power during maintenance; edge units need a graceful restart and buffer replay.",m:"Shaheer K. · 14 Aug"}
+      ]},
+    tasks:[
+      {t:"Quotation rev 2 — 230-site tiering",lane:"Sales",who:"saif",assist:["saifullah"],due:"2026-09-15",s:"doing",src:"customer"},
+      {t:"Buffer replay on power loss",lane:"Development",who:"saif",assist:["shaheer","talha"],due:"2026-09-25",s:"doing",src:"customer"},
+      {t:"Validate SIM tariff assumptions with operator",lane:"Sales",who:"ali",assist:[],due:"2026-09-08",s:"todo",src:"internal"},
+      {t:"Issue PoC closure note to EVIQ",lane:"Sales",who:"yas",assist:["saifullah"],due:"2026-09-12",s:"todo",src:"internal"},
+      {t:"PoC report sign-off",lane:"Technical",who:"saif",assist:["saifullah"],due:"2026-08-28",s:"done",src:"internal"}
+    ],
+    events:[
+      {d:"2026-09-09T13:00",ty:"minute",ti:"Procurement call — tiering and terms",by:"yas",
+       b:"Procurement wants per-site pricing tiers at 50/100/230 sites and a two-year commitment option. Technical scope is settled; this is now a commercial conversation.",at:["Attendees ×4","3 actions raised"]},
+      {d:"2026-09-08T10:00",ty:"task",ti:"Buffer replay work started",by:"shaheer",
+       b:"Picking up graceful restart and buffer replay after the maintenance power-loss finding.",at:["Raised by customer"]},
+      {d:"2026-09-04T09:30",ty:"update",ti:"Weekly progress",by:"saif",
+       b:"PoC closed successfully. Quotation rev 1 landed; rev 2 with tiering due 15 Sep.",at:["Week 36"]},
+      {d:"2026-08-28T15:00",ty:"stage",ti:"Moved to Quotation",by:"saif",b:"PoC signed off at both pilot sites.",at:["POC → Quotation"]}
+    ]
+  },
+  {
+    id:"palace", name:"Palace & Villa Emergency Alarm", customer:"Confidential — via main contractor",
+    stage:3, health:"ok", value:"2.10M", cur:"AED", close:"2026-09-30", product:"OrcaStream Core",
+    cams:"640 cameras · 12 compounds", nextStep:"Commercial clarification response", nextDate:"2026-09-14",
+    team:{owner:"tim",co:"ali",comms:"yas",tech:"talha",dev:["abdullah"]},
+    gates:[
+      {t:"Technical clarifications answered",on:true,o:"TQ"},
+      {t:"Bid bond issued",on:true,o:"TA"},
+      {t:"Commercial clarification round 2",on:false,o:"TA"},
+      {t:"Final pricing approved internally",on:false,o:"AS"}
+    ],
+    poc:null,
+    tasks:[
+      {t:"Answer commercial clarification set 2",lane:"Sales",who:"tim",assist:["talha"],due:"2026-09-14",s:"doing",src:"customer"},
+      {t:"Retention sizing for Core deployment",lane:"Technical",who:"tim",assist:["talha","abdullah"],due:"2026-09-13",s:"todo",src:"customer"},
+      {t:"Confirm bid bond validity extension",lane:"Sales",who:"yas",assist:[],due:"2026-09-07",s:"todo",src:"internal"}
+    ],
+    events:[
+      {d:"2026-09-10T09:00",ty:"comm",ti:"Clarification set 2 received",by:"yas",
+       b:"Eight commercial questions, response due 14 Sep. Two touch retention sizing and route to the technical team.",at:["Email thread","Deadline 14 Sep"]},
+      {d:"2026-09-02T11:30",ty:"minute",ti:"Negotiation session — main contractor",by:"tim",
+       b:"Contractor pushed on payment milestones and asked for a 5% reduction on the Core licence line. Held pricing, offered extended support term instead.",at:["Attendees ×5"]},
+      {d:"2026-08-30T10:00",ty:"stage",ti:"Moved to Negotiation",by:"tim",b:"Technical evaluation passed; shortlisted with one other vendor.",at:["Quotation → Negotiation"]}
+    ]
+  },
+  {
+    id:"dmt", name:"DMT Smart Stormwater Monitoring", customer:"Digital NXT / DMT",
+    stage:0, health:"ok", value:"480K", cur:"AED", close:"2026-12-15", product:"OrcaStream Edge",
+    cams:"310 cameras · 96 outfalls", nextStep:"Qualification call with Digital NXT", nextDate:"2026-09-16",
+    team:{owner:"yas",co:"tim",comms:"yas",tech:"shaheer",dev:[]},
+    gates:[
+      {t:"RFP scope read and compression scope isolated",on:true,o:"YA"},
+      {t:"Partner role with Digital NXT agreed",on:false,o:"TA"},
+      {t:"Qualification call held",on:false,o:"YA"}
+    ],
+    poc:null,
+    tasks:[
+      {t:"Prepare qualification call brief",lane:"Sales",who:"yas",assist:["shaheer"],due:"2026-09-15",s:"doing",src:"internal"},
+      {t:"Isolate compression scope from sensor scope",lane:"Technical",who:"tim",assist:["shaheer","mishal"],due:"2026-09-14",s:"todo",src:"internal"}
+    ],
+    events:[
+      {d:"2026-09-08T14:00",ty:"comm",ti:"Intro from Digital NXT",by:"yas",
+       b:"Digital NXT leads the sensor scope and wants us on the video side only. Qualification call being scheduled for 16 Sep.",at:["Email thread"]},
+      {d:"2026-09-08T14:05",ty:"stage",ti:"Opportunity created",by:"yas",b:"Logged at Introduction. Owner Yasmeen A., co-owner Tim A.",at:["Introduction"]}
+    ]
+  },
+  {
+    id:"metro", name:"Metro depot retrofit — Core evaluation", customer:"Regional transit operator",
+    stage:1, health:"hot", value:"1.05M", cur:"AED", close:"2026-10-31", product:"OrcaStream Core",
+    cams:"3,900 cameras · 4 depots", nextStep:"PoC scope unsigned — 11 days idle", nextDate:"2026-09-12",
+    team:{owner:"ali",co:"tim",comms:"yas",tech:"talha",dev:["saifullah"]},
+    gates:[
+      {t:"Datacentre access approved",on:true,o:"AS"},
+      {t:"PoC scope signed by operator",on:false,o:"AS"},
+      {t:"Baseline capture on depot 2",on:false,o:"TQ"},
+      {t:"Results review with operations",on:false,o:"TQ"}
+    ],
+    poc:{window:"Not started — scope unsigned", site:"Depot 2 (proposed)",
+      kpis:[
+        {k:"Baseline captured",v:"0",u:"%",d:"awaiting scope signature"},
+        {k:"Days idle",v:"11",u:"",d:"since last customer contact"},
+        {k:"Cameras in scope",v:"3,900",u:"",d:"largest Core opportunity open"},
+        {k:"Gates closed",v:"1 / 4",u:"",d:""}
+      ],
+      findings:[
+        {k:"crit",h:"Scope signature stalled",b:"Operator's security team has not returned the PoC scope. No contact for 11 days — this is the reason the opportunity is flagged.",m:"Ali S. · 08 Sep"}
+      ]},
+    tasks:[
+      {t:"Chase PoC scope signature",lane:"Sales",who:"ali",assist:[],due:"2026-09-05",s:"blocked",src:"internal"},
+      {t:"Prepare depot 2 baseline capture plan",lane:"Technical",who:"tim",assist:["talha","saifullah"],due:"2026-09-24",s:"todo",src:"internal"},
+      {t:"Escalate through operations contact",lane:"Sales",who:"ali",assist:["yas"],due:"2026-09-11",s:"todo",src:"internal"}
+    ],
+    events:[
+      {d:"2026-09-08T17:00",ty:"update",ti:"Flagged at risk — no contact 11 days",by:"ali",
+       b:"Security team has not returned the signed PoC scope. Escalating through the operations contact this week.",at:["Health: at risk"]},
+      {d:"2026-08-25T10:00",ty:"minute",ti:"Scoping workshop — depots 1 and 2",by:"yas",
+       b:"Operator prefers a Core deployment in their existing datacentre. Depot 2 chosen for the PoC because of its camera mix.",at:["Attendees ×7"]},
+      {d:"2026-08-20T09:00",ty:"stage",ti:"Moved to POC",by:"ali",b:"Datacentre access approved; PoC scope drafted.",at:["Introduction → POC"]}
+    ]
+  }
+];
+
+/* ---------------- helpers ---------------- */
+const state={opp:"qth",tab:"pulse",types:new Set(),person:"all",day:null,q:"",role:"owner",railStage:"all",assist:new Set()};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtDay=iso=>new Date(iso+(iso.length>10?"":"T00:00")).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+const fmtTime=iso=>new Date(iso).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+const cur=()=>OPPS.find(o=>o.id===state.opp);
+const dayDiff=(a,b)=>Math.round((new Date(a+"T00:00")-new Date(b+"T00:00"))/864e5);
+
+function dueState(t){
+  if(t.s==="done") return "done";
+  const d=dayDiff(t.due,TODAY);
+  if(d<0) return "over";
+  if(d===0) return "today";
+  if(d<=7) return "soon";
+  return "later";
+}
+function dueLabel(t){
+  const d=dayDiff(t.due,TODAY);
+  if(t.s==="done") return "done";
+  if(d<0) return `${-d} day${d===-1?"":"s"} late`;
+  if(d===0) return "due today";
+  if(d===1) return "due tomorrow";
+  return `in ${d} days`;
+}
+function avatar(id,cls){const p=P[id];return `<span class="av ${cls||""}" title="${esc(p.n)}">${p.i}</span>`;}
+function overdueCount(o){return o.tasks.filter(t=>dueState(t)==="over").length;}
+
+const ROLE_TABS={
+  owner:["pulse","minutes","tasks","poc","calendar"],
+  comms:["pulse","minutes","tasks","calendar"],
+  tech:["pulse","minutes","tasks","poc","calendar"],
+  dev:["pulse","tasks","poc"]
+};
+function roleTasks(o){
+  let ts=o.tasks.slice();
+  if(state.role==="dev") ts=ts.filter(t=>t.lane==="Development");
+  if(state.role==="tech") ts=ts.filter(t=>t.lane!=="Sales");
+  return ts;
+}
+function currentUser(){
+  const t=cur().team;
+  return {owner:t.owner, comms:t.comms, tech:t.tech, dev:t.dev[0]||t.tech}[state.role];
+}
+
+/* ---------------- rail ---------------- */
+function renderRail(){
+  const f=$("#railFilter");
+  const opts=[["all","All"],["0","Intro"],["1","POC"],["2","Quote"],["3","Nego"]];
+  f.innerHTML=opts.map(([v,l])=>`<button class="mini-chip" data-stage="${v}" aria-pressed="${state.railStage===v}">${l}</button>`).join("");
+  f.querySelectorAll("button").forEach(b=>b.onclick=()=>{state.railStage=b.dataset.stage;renderRail();});
+
+  const list=OPPS.filter(o=>state.railStage==="all"||String(o.stage)===state.railStage);
+  $("#oppCount").textContent=list.length;
+  $("#railList").innerHTML=list.map(o=>{
+    const od=overdueCount(o);
+    return `<button class="opp-item ${o.health}" data-id="${o.id}" aria-current="${o.id===state.opp}">
+      <span class="bar"></span>
+      <span>
+        <span class="name">${esc(o.name)}</span>
+        <span class="sub">${STAGES[o.stage]} · <b>${o.cur} ${o.value}</b>${od?`<span class="od-badge">${od} overdue</span>`:""}</span>
+        <span class="sub">${esc(o.nextStep)}</span>
+      </span></button>`;
+  }).join("");
+  $("#railList").querySelectorAll(".opp-item").forEach(b=>b.onclick=()=>{
+    state.opp=b.dataset.id;state.day=null;state.q="";state.types.clear();state.person="all";
+    renderAll();
+  });
+}
+
+/* ---------------- spine ---------------- */
+function renderSpine(){
+  const o=cur(), t=o.team;
+  const done=o.gates.filter(g=>g.on).length, pct=Math.round(done/o.gates.length*100);
+  const member=(key,role,scope,own)=>{const p=P[key];if(!p)return "";
+    return `<div class="person">${avatar(key,own?"own":"")}
+      <span><span class="who">${p.n}</span><br><span class="role">${role}</span></span>
+      <span class="scope">${scope}</span></div>`;};
+  $("#spine").innerHTML=`
+    <div>
+      <h1 class="opp-title">${esc(o.name)}</h1>
+      <div class="opp-meta"><span>${esc(o.customer)}</span>
+        <span class="tag accent">${o.product}</span><span class="tag">${o.cams}</span></div>
+    </div>
+    <div class="pipe" aria-label="Stage">
+      ${STAGES.map((s,i)=>`<span class="step ${i<o.stage?"done":""} ${i===o.stage?"now":""}"><span class="lbl">${s}</span></span>`).join("")}
+    </div>
+    <div class="card">
+      <div class="facts">
+        <div class="fact"><div class="k">Value</div><div class="v num">${o.cur} ${o.value}</div></div>
+        <div class="fact"><div class="k">Target close</div><div class="v num">${fmtDay(o.close)} ${o.close.slice(0,4)}</div></div>
+        <div class="fact" style="grid-column:1/-1"><div class="k">Next step</div>
+          <div class="v">${esc(o.nextStep)} <span class="pill" style="margin-left:4px">${fmtDay(o.nextDate)}</span></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Stage gate — ${STAGES[o.stage]}</h3><span class="eyebrow">${done}/${o.gates.length}</span></div>
+      <div class="meter" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
+      <div class="gate">${o.gates.map((g,i)=>`<button class="gate-row ${g.on?"on":""}" data-g="${i}">
+        <span class="box">✓</span><span class="txt">${esc(g.t)}</span><span class="owner">${g.o}</span></button>`).join("")}</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Who's on it</h3></div>
+      <div class="people">
+        ${member(t.owner,"Owner","full",true)}
+        ${member(t.co,"Co-owner","full")}
+        ${t.comms!==t.owner&&t.comms!==t.co?member(t.comms,"Communications coordinator","full"):""}
+        ${member(t.tech,"Technical lead","work")}
+        ${t.dev.map(d=>member(d,"Technical / development","tasks")).join("")}
+      </div>
+      <p class="pane-note" style="margin:10px 0 0">Contributors write anywhere. Assisting team members see context and post to their own items.</p>
+    </div>`;
+  $("#spine").querySelectorAll(".gate-row").forEach(b=>b.onclick=()=>{
+    o.gates[+b.dataset.g].on=!o.gates[+b.dataset.g].on;renderSpine();});
+}
+
+/* ---------------- tabs ---------------- */
+function renderTabs(){
+  const o=cur(), allowed=ROLE_TABS[state.role].filter(k=>k!=="poc"||o.poc);
+  if(!allowed.includes(state.tab)) state.tab=allowed[0];
+  const od=roleTasks(o).filter(t=>dueState(t)==="over").length;
+  const defs={
+    pulse:{label:"Pulse",count:o.events.length,alert:od},
+    minutes:{label:"Minutes",count:o.events.filter(e=>e.ty==="minute").length},
+    tasks:{label:"Tasks",count:roleTasks(o).filter(t=>t.s!=="done").length,alert:od},
+    poc:{label:"PoC record",count:o.poc?o.poc.findings.length:0},
+    calendar:{label:"Calendar",count:null}
+  };
+  $("#tabs").innerHTML=allowed.map(k=>{const d=defs[k];
+    return `<button class="tab" role="tab" data-tab="${k}" aria-selected="${state.tab===k}">${d.label}
+      ${d.count!==null?`<span class="count ${d.alert?"alert":""}">${d.count}</span>`:""}</button>`;
+  }).join("")+`<button class="solid-btn newtask" id="newTask">+ New task</button>`;
+  $("#tabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;renderStream();});
+  $("#newTask").onclick=openTaskDialog;
+}
+
+/* ---------------- filter bar ---------------- */
+function renderFilterBar(){
+  const bar=$("#filterbar");
+  if(!(state.tab==="pulse"||state.tab==="minutes")){bar.style.display="none";return;}
+  bar.style.display="flex";
+  const o=cur(), people=[...new Set(o.events.map(e=>e.by))];
+  bar.innerHTML=`
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input id="q" type="search" placeholder="Search minutes, updates, findings…" value="${esc(state.q)}" aria-label="Search activity">
+    </div>
+    ${state.tab==="pulse"?TYPES.map(t=>`<button class="chip" data-ty="${t.id}" aria-pressed="${state.types.has(t.id)}">
+      <span class="sw" style="background:${typeSwatch(t.id)}"></span>${t.label}</button>`).join(""):""}
+    <label class="field" for="who">By
+      <select id="who"><option value="all">Anyone</option>
+      ${people.map(p=>`<option value="${p}" ${state.person===p?"selected":""}>${P[p].n}</option>`).join("")}</select></label>
+    ${(state.day||state.types.size||state.q||state.person!=="all")?
+      `<button class="clearfx" id="clearf">Clear${state.day?` · ${fmtDay(state.day)}`:""}</button>`:""}`;
+  const qi=bar.querySelector("#q");
+  qi.oninput=()=>{state.q=qi.value;renderPane();};
+  bar.querySelectorAll("[data-ty]").forEach(b=>b.onclick=()=>{
+    const t=b.dataset.ty;state.types.has(t)?state.types.delete(t):state.types.add(t);
+    b.setAttribute("aria-pressed",state.types.has(t));renderPane();});
+  bar.querySelector("#who").onchange=e=>{state.person=e.target.value;renderPane();};
+  const c=bar.querySelector("#clearf");
+  if(c) c.onclick=()=>{state.day=null;state.types.clear();state.q="";state.person="all";renderFilterBar();renderPane();};
+}
+const typeSwatch=id=>({minute:"var(--accent)",update:"var(--ink-3)",task:"var(--warm)",poc:"var(--good)",comm:"var(--ink-2)",stage:"var(--ink)"}[id]);
+const typeSwatchSoft=id=>({minute:"var(--accent-soft)",update:"var(--surface-2)",task:"var(--warm-soft)",poc:"var(--good-soft)",comm:"var(--surface-3)",stage:"var(--surface-3)"}[id]);
+
+/* ---------------- panes ---------------- */
+function filteredEvents(){
+  const o=cur();
+  let ev=o.events.slice();
+  if(state.tab==="minutes") ev=ev.filter(e=>e.ty==="minute");
+  else if(state.types.size) ev=ev.filter(e=>state.types.has(e.ty));
+  if(state.person!=="all") ev=ev.filter(e=>e.by===state.person);
+  if(state.day) ev=ev.filter(e=>e.d.slice(0,10)===state.day);
+  if(state.q.trim()){const q=state.q.toLowerCase();ev=ev.filter(e=>(e.ti+" "+e.b).toLowerCase().includes(q));}
+  if(state.role==="dev") ev=ev.filter(e=>["task","poc","stage"].includes(e.ty));
+  return ev;
+}
+
+function attentionBlock(){
+  const o=cur();
+  let ts=roleTasks(o).filter(t=>["over","today","soon"].includes(dueState(t)));
+  if(state.person!=="all") ts=ts.filter(t=>t.who===state.person||t.assist.includes(state.person));
+  if(state.day) ts=ts.filter(t=>t.due===state.day);
+  const rank={over:0,today:1,soon:2};
+  ts.sort((a,b)=>rank[dueState(a)]-rank[dueState(b)]||a.due.localeCompare(b.due));
+  const over=ts.filter(t=>dueState(t)==="over").length;
+  const today=ts.filter(t=>dueState(t)==="today").length;
+  const soon=ts.filter(t=>dueState(t)==="soon").length;
+  if(!ts.length) return `<div class="attn"><div class="attn-h">
+      <span class="lead" style="color:var(--good)">Nothing overdue</span>
+      <span class="split"></span><span class="pane-note">No tasks due in the next 7 days.</span></div></div>`;
+  return `<div class="attn ${over?"urgent":""}">
+    <div class="attn-h">
+      <span class="lead">${over?"Needs attention":"Coming up"}</span>
+      <span class="split"></span>
+      <span class="tally">
+        ${over?`<span class="od">${over} overdue</span>`:""}
+        ${today?`<span class="dt">${today} due today</span>`:""}
+        ${soon?`<span class="up">${soon} this week</span>`:""}
+      </span>
+    </div>
+    <div class="attn-list">
+      ${ts.map(t=>{const st=dueState(t);
+        return `<button class="arow ${st}" data-go="tasks">
+          <span class="stripe"></span>
+          ${avatar(t.who,"sm")}
+          <span><span class="t">${esc(t.t)}</span>
+            <span class="m">${t.lane} · ${P[t.who].n}
+              ${t.assist.length?`<span class="avstack">${t.assist.map(a=>avatar(a,"sm")).join("")}</span>`:""}
+              ${t.src==="customer"?`<span class="pill q">Customer</span>`:""}
+              ${t.s==="blocked"?`<span class="pill bad">Blocked</span>`:""}</span></span>
+          <span class="rt"><span class="whenpill ${st}">${dueLabel(t)}</span>
+            <span class="due" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-3)">${fmtDay(t.due)}</span></span>
+        </button>`;}).join("")}
+    </div></div>`;
+}
+
+function paneStream(){
+  const ev=filteredEvents();
+  const head = state.tab==="pulse" ? attentionBlock() : "";
+  const tl = ev.length
+    ? `<div class="tl">${ev.map(e=>{const t=TYPE[e.ty],p=P[e.by];
+        return `<article class="ev">
+          <div class="when">${fmtDay(e.d)}<em>${fmtTime(e.d)}</em></div>
+          <div class="spinecol"><span class="knob ${t.cls}" title="${t.label}">${t.icon}</span><span class="rule"></span></div>
+          <div class="body">
+            <div class="hd"><span class="ttl">${esc(e.ti)}</span><span class="by">${p.n} · ${p.r}</span></div>
+            <p class="txt">${esc(e.b)}</p>
+            <div class="attach">${e.at.map(a=>`<span class="pill ${/customer|blocked|deadline/i.test(a)?"q":""}">${esc(a)}</span>`).join("")}</div>
+          </div></article>`;}).join("")}</div>`
+    : `<div class="empty">Nothing matches these filters.</div>`;
+  return `<div class="pane">${head}${tl}</div>`;
+}
+
+function paneTasks(){
+  const o=cur(), ts=roleTasks(o);
+  const lanes=["Sales","Technical","Development"];
+  const order={blocked:0,doing:1,todo:2,done:3};
+  const body=lanes.map(l=>{
+    const rows=ts.filter(t=>t.lane===l).sort((a,b)=>order[a.s]-order[b.s]||a.due.localeCompare(b.due));
+    if(!rows.length) return "";
+    const od=rows.filter(t=>dueState(t)==="over").length;
+    return `<div class="lane">
+      <div class="lane-h"><h4>${l}</h4><span class="line"></span>
+        ${od?`<span class="od-badge">${od} overdue</span>`:""}
+        <span class="eyebrow">${rows.filter(r=>r.s!=="done").length} open</span></div>
+      ${rows.map(t=>{const st=dueState(t);
+        return `<div class="task s-${t.s} ${st==="over"?"overdue":""}">
+          ${avatar(t.who)}
+          <span><span class="t">${esc(t.t)}</span>
+            <span class="m">${P[t.who].n}
+              ${t.assist.length?`<span class="avstack">${t.assist.map(a=>avatar(a,"sm")).join("")}</span>`:""}
+              ${t.src==="customer"?`<span class="pill q">Raised by customer</span>`:""}</span></span>
+          <span class="right"><span class="whenpill ${st}">${dueLabel(t)}</span>
+            <span class="status">${t.s==="doing"?"in progress":t.s}</span></span></div>`;}).join("")}</div>`;
+  }).join("");
+  return `<div class="pane">
+    <p class="pane-note">One responsible person per task, any number of assisting team members. Overdue rows carry the red edge.</p>
+    ${body||`<div class="empty">No tasks in your lanes.</div>`}</div>`;
+}
+
+function panePoc(){
+  const o=cur();
+  if(!o.poc) return `<div class="empty">No PoC on this opportunity yet.</div>`;
+  const col={good:"var(--good)",warn:"var(--warn)",crit:"var(--crit)"};
+  return `<div class="pane">
+    <div class="card">
+      <div class="card-h"><h3>PoC record</h3><span class="eyebrow">${esc(o.poc.window)}</span></div>
+      <div class="pane-note" style="margin-bottom:12px">Site: ${esc(o.poc.site)}</div>
+      <div class="poc-grid">${o.poc.kpis.map(k=>`<div class="kpi"><div class="k">${esc(k.k)}</div>
+        <div class="v">${esc(k.v)}${k.u?`<small> ${esc(k.u)}</small>`:""}</div><div class="d">${esc(k.d)}</div></div>`).join("")}</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Findings, feedback &amp; blockers</h3></div>
+      ${o.poc.findings.map(f=>`<div class="finding"><span class="dotmark" style="background:${col[f.k]}"></span>
+        <div><div class="h">${esc(f.h)}</div><div class="b">${esc(f.b)}</div><div class="meta">${esc(f.m)}</div></div></div>`).join("")}
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Report</h3></div>
+      <div class="pane-note">Findings above compose the PoC report — the technical team writes once, sales quotes from the same numbers.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <span class="pill">Draft v2</span><span class="pill">Owner: ${P[o.team.tech].n}</span><span class="pill q">Due ${fmtDay(o.nextDate)}</span></div>
+    </div></div>`;
+}
+
+function paneCalendar(){
+  const o=cur(), Y=2026, M=8;
+  const start=(new Date(Y,M,1).getDay()+6)%7, days=new Date(Y,M+1,0).getDate();
+  const byDay={};
+  const push=(k,v)=>{(byDay[k]=byDay[k]||[]).push(v);};
+  o.events.forEach(e=>push(e.d.slice(0,10),{kind:"ev",ty:e.ty,ti:e.ti}));
+  roleTasks(o).forEach(t=>push(t.due,{kind:"task",st:dueState(t),ti:t.t,lane:t.lane}));
+  const dow=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  let cells=dow.map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let i=0;i<start;i++) cells+=`<div class="day pad"></div>`;
+  for(let d=1;d<=days;d++){
+    const iso=`${Y}-09-${String(d).padStart(2,"0")}`;
+    const items=(byDay[iso]||[]).sort((a,b)=>(a.kind==="task"?0:1)-(b.kind==="task"?0:1));
+    const hasOver=items.some(i=>i.kind==="task"&&i.st==="over");
+    cells+=`<button class="day ${iso===TODAY?"today":""} ${hasOver?"hasover":""}" data-day="${iso}" aria-pressed="${state.day===iso}">
+      <span class="n">${d}</span>
+      ${items.slice(0,3).map(it=>{
+        if(it.kind==="task"){
+          const cls=it.st==="over"?"ec-over":it.st==="done"?"ec-donetask":"ec-due";
+          return `<span class="ec ${cls}">${it.st==="over"?"⚑ ":"◷ "}${esc(it.ti)}</span>`;
+        }
+        return `<span class="ec" style="background:${typeSwatchSoft(it.ty)};color:${typeSwatch(it.ty)}">${esc(it.ti)}</span>`;
+      }).join("")}
+      ${items.length>3?`<span class="more">+${items.length-3} more</span>`:""}</button>`;
+  }
+  return `<div class="pane">
+    <div class="cal-head"><h3>September 2026</h3>
+      <span class="pane-note">Task due dates and activity on one grid. Click a day to filter the Pulse stream to it.</span></div>
+    <div class="cal">${cells}</div>
+    <div class="legend">
+      <span class="pane-note"><span class="swx" style="background:var(--crit)"></span>Overdue task</span>
+      <span class="pane-note"><span class="swx" style="background:var(--warm-soft);border:1px solid var(--warm-line)"></span>Task due</span>
+      <span class="pane-note"><span class="swx" style="background:var(--good-soft)"></span>Completed</span>
+      ${TYPES.map(t=>`<span class="pane-note"><span class="swx" style="background:${typeSwatch(t.id)}"></span>${t.label}</span>`).join("")}
+    </div></div>`;
+}
+
+function renderPane(){
+  const host=$("#paneHost");
+  if(state.tab==="tasks") host.innerHTML=paneTasks();
+  else if(state.tab==="poc") host.innerHTML=panePoc();
+  else if(state.tab==="calendar"){
+    host.innerHTML=paneCalendar();
+    host.querySelectorAll(".day[data-day]").forEach(b=>b.onclick=()=>{
+      state.day=state.day===b.dataset.day?null:b.dataset.day;state.tab="pulse";renderStream();});
+  } else {
+    host.innerHTML=paneStream();
+    host.querySelectorAll("[data-go='tasks']").forEach(b=>b.onclick=()=>{state.tab="tasks";renderStream();});
+  }
+}
+function renderStream(){renderTabs();renderFilterBar();renderPane();}
+function renderAll(){renderRail();renderSpine();renderStream();}
+
+/* ---------------- new task ---------------- */
+function openTaskDialog(){
+  const o=cur(), t=o.team;
+  const contributors=[...new Set([t.owner,t.co,t.comms])];
+  const others=[...COMMERCIAL,...TECHNICAL].filter(p=>!contributors.includes(p));
+  $("#tWho").innerHTML=
+    `<optgroup label="Opportunity contributors">${contributors.map(p=>`<option value="${p}">${P[p].n} — ${p===t.owner?"Owner":p===t.co?"Co-owner":"Coordinator"}</option>`).join("")}</optgroup>`+
+    `<optgroup label="Other team members">${others.map(p=>`<option value="${p}">${P[p].n} — ${P[p].r}</option>`).join("")}</optgroup>`;
+  state.assist=new Set();
+  $("#tAssist").innerHTML=
+    `<div class="pkgroup">Commercial</div><div class="picker">${COMMERCIAL.map(pk).join("")}</div>`+
+    `<div class="pkgroup">Technical team</div><div class="picker">${TECHNICAL.map(pk).join("")}</div>`;
+  $("#tAssist").querySelectorAll(".pk").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.p;state.assist.has(id)?state.assist.delete(id):state.assist.add(id);
+    b.setAttribute("aria-pressed",state.assist.has(id));});
+  const d=new Date(2026,8,11+7);
+  $("#tDue").value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  $("#tTitle").value="";
+  $("#tLane").value=state.role==="dev"?"Development":state.role==="tech"?"Technical":"Sales";
+  $("#taskOverlay").dataset.open="true";
+  setTimeout(()=>$("#tTitle").focus(),30);
+}
+const pk=id=>`<button type="button" class="pk" data-p="${id}" aria-pressed="false">${avatar(id,"sm")}${P[id].n}</button>`;
+
+$("#taskForm").onsubmit=e=>{
+  e.preventDefault();
+  const o=cur(), title=$("#tTitle").value.trim();
+  if(!title) return;
+  const who=$("#tWho").value, due=$("#tDue").value, lane=$("#tLane").value, src=$("#tSrc").value;
+  const assist=[...state.assist].filter(a=>a!==who);
+  o.tasks.unshift({t:title,lane,who,assist,due,s:"todo",src});
+  const by=currentUser();
+  o.events.unshift({d:"2026-09-11T"+new Date().toTimeString().slice(0,5),ty:"task",
+    ti:"Task created — "+title, by,
+    b:`${lane} lane. ${P[who].n} responsible, due ${fmtDay(due)}${assist.length?`, assisted by ${assist.map(a=>P[a].n).join(", ")}`:""}.`,
+    at:[`Due ${fmtDay(due)}`, ...(src==="customer"?["Raised by customer"]:[])]});
+  $("#taskOverlay").dataset.open="false";
+  state.tab="tasks";renderAll();
+  toast(`Task created · ${P[who].n} · due ${fmtDay(due)}`);
+};
+$("#tCancel").onclick=()=>$("#taskOverlay").dataset.open="false";
+$("#taskOverlay").onclick=e=>{if(e.target.id==="taskOverlay") $("#taskOverlay").dataset.open="false";};
+
+let toastT;
+function toast(msg){const el=$("#toast");el.textContent=msg;el.dataset.show="true";
+  clearTimeout(toastT);toastT=setTimeout(()=>el.dataset.show="false",2600);}
+
+/* ---------------- chrome ---------------- */
+$("#mSplit").onclick=()=>setMode("split");
+$("#mFocus").onclick=()=>setMode("focus");
+function setMode(m){$("#work").dataset.mode=m;
+  $("#mSplit").setAttribute("aria-pressed",m==="split");$("#mFocus").setAttribute("aria-pressed",m==="focus");}
+$("#roleSel").onchange=e=>{state.role=e.target.value;renderStream();};
+$("#openNotes").onclick=()=>$("#notes").dataset.open="true";
+$("#closeNotes").onclick=()=>$("#notes").dataset.open="false";
+$("#notes").onclick=e=>{if(e.target.id==="notes") $("#notes").dataset.open="false";};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#notes").dataset.open="false";$("#taskOverlay").dataset.open="false";}});
+
+renderAll();
+</script>

@@ -31,6 +31,8 @@ export default function AppLayout() {
 
   if (!hasRole) return <PendingAccessPage />;
 
+  const isWorkspace = location.pathname.startsWith("/workspace");
+
   return (
     <div className="app-shell">
       <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
@@ -59,7 +61,7 @@ export default function AppLayout() {
       </header>
 
       <main className="app-main lg:ml-60">
-        <div className="app-content">
+        <div className={isWorkspace ? "app-content app-content--bleed" : "app-content"}>
           <Outlet />
         </div>
       </main>

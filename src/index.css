@@ -66,6 +66,12 @@ h1, h2, .font-display {
   }
 }
 
+.app-content--bleed {
+  max-width: none;
+  margin-inline: 0;
+  padding: 0;
+}
+
 /* Cards / panels */
 .panel {
   background: #fff;
