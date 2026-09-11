@@ -5,9 +5,11 @@ import { useAuth } from "@/context/AuthContext";
 import {
   getTags, renameTag, mergeTags, cleanupDuplicateTags, type CrmTag,
 } from "@/lib/crm";
+import { canManageCrmData } from "@/lib/permissions";
 
 export default function AdminTagsPage() {
-  const { isAdmin } = useAuth();
+  const { profile } = useAuth();
+  const canManage = canManageCrmData(profile);
   const [tags, setTags] = useState<CrmTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [mergeSource, setMergeSource] = useState("");
@@ -15,9 +17,9 @@ export default function AdminTagsPage() {
   const [busy, setBusy] = useState(false);
 
   const load = () => getTags().then(setTags).finally(() => setLoading(false));
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+  useEffect(() => { if (canManage) load(); }, [canManage]);
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!canManage) return <Navigate to="/dashboard" replace />;
 
   const handleRename = async (t: CrmTag) => {
     const next = prompt("Rename tag", t.name);

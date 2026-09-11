@@ -5,9 +5,11 @@ import {
   type Vendor, type Product,
 } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { canManageCrmData } from "@/lib/permissions";
 
 export default function VendorsPage() {
-  const { isAdmin } = useAuth();
+  const { profile, isAdmin } = useAuth();
+  const canManage = canManageCrmData(profile);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -43,7 +45,7 @@ export default function VendorsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Vendors</h1>
           <p className="text-gray-500 text-sm mt-1">{filtered.length} vendors</p>
         </div>
-        {isAdmin && (
+        {canManage && (
           <button onClick={() => { setEditVendor(null); setShowModal(true); }}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus className="w-4 h-4" /> Add Vendor
@@ -72,10 +74,12 @@ export default function VendorsPage() {
                 <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
                   <Store className="w-5 h-5 text-indigo-600" />
                 </div>
-                {isAdmin && (
+                {canManage && (
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => { setEditVendor(v); setShowModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleDelete(v)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {isAdmin && (
+                      <button onClick={() => handleDelete(v)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                    )}
                   </div>
                 )}
               </div>

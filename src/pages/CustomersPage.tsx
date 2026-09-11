@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Search, Building2, Globe, Phone, ChevronRight } from "lucide-react";
 import { getCustomers, createCustomer, type Customer } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { canManageCrmData } from "@/lib/permissions";
 
 export default function CustomersPage() {
-  const { isAdmin } = useAuth();
+  const { profile } = useAuth();
+  const canManage = canManageCrmData(profile);
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
@@ -26,7 +28,7 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
           <p className="text-gray-500 text-sm mt-1">{filtered.length} customers</p>
         </div>
-        {isAdmin && (
+        {canManage && (
           <button onClick={() => setShowModal(true)}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
             <Plus className="w-4 h-4" /> Add Customer

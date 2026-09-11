@@ -7,18 +7,20 @@ import {
   type CatalogProduct,
 } from "@/lib/crm";
 import { CATALOG_COLORS } from "@/lib/utils";
+import { canManageCrmData } from "@/lib/permissions";
 
 export default function AdminProductsPage() {
-  const { isAdmin } = useAuth();
+  const { profile } = useAuth();
+  const canManage = canManageCrmData(profile);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<CatalogProduct | null>(null);
   const [creating, setCreating] = useState(false);
 
   const load = () => getCatalogProducts().then(setProducts).finally(() => setLoading(false));
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+  useEffect(() => { if (canManage) load(); }, [canManage]);
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!canManage) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="space-y-6">

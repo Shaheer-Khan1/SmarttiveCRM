@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getNotifications } from "@/lib/firestore";
+import { canManageCrmData, canManageUsers } from "@/lib/permissions";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -49,7 +50,9 @@ export default function Sidebar({ mobileOpen = false, onClose }: Props) {
 }
 
 function SidebarPanel({ onClose }: { onClose?: () => void }) {
-  const { user, profile, isAdmin, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const canManageData = canManageCrmData(profile);
+  const canUsers = canManageUsers(profile);
   const navigate = useNavigate();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
@@ -115,23 +118,31 @@ function SidebarPanel({ onClose }: { onClose?: () => void }) {
           </>
         </NavLink>
 
-        {isAdmin && (
+        {(canUsers || canManageData) && (
           <>
             <div className="pt-4 pb-1.5 px-3">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">Admin</p>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+                {canUsers ? "Admin" : "Manage"}
+              </p>
             </div>
-            <NavLink to="/admin/users" className={linkClass}>
-              <Users className="w-[18px] h-[18px]" />
-              <span>Users</span>
-            </NavLink>
-            <NavLink to="/admin/products" className={linkClass}>
-              <Palette className="w-[18px] h-[18px]" />
-              <span>Products</span>
-            </NavLink>
-            <NavLink to="/admin/tags" className={linkClass}>
-              <Tags className="w-[18px] h-[18px]" />
-              <span>Tags</span>
-            </NavLink>
+            {canUsers && (
+              <NavLink to="/admin/users" className={linkClass}>
+                <Users className="w-[18px] h-[18px]" />
+                <span>Users</span>
+              </NavLink>
+            )}
+            {canManageData && (
+              <>
+                <NavLink to="/admin/products" className={linkClass}>
+                  <Palette className="w-[18px] h-[18px]" />
+                  <span>Products</span>
+                </NavLink>
+                <NavLink to="/admin/tags" className={linkClass}>
+                  <Tags className="w-[18px] h-[18px]" />
+                  <span>Tags</span>
+                </NavLink>
+              </>
+            )}
           </>
         )}
       </nav>

@@ -46,6 +46,18 @@ export function canCreateCrmRecords(profile: UserProfile | null | undefined): bo
 }
 
 /**
+ * Managers and Admins can create/manage CRM data (customers, vendors, catalog, tags).
+ * User management stays Admin-only.
+ */
+export function canManageCrmData(profile: UserProfile | null | undefined): boolean {
+  return isAdmin(profile) || isManager(profile);
+}
+
+export function canManageUsers(profile: UserProfile | null | undefined): boolean {
+  return isAdmin(profile);
+}
+
+/**
  * Delete policy:
  * - Admin: anything
  * - Manager: only records they created

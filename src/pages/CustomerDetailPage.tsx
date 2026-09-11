@@ -4,12 +4,13 @@ import { ArrowLeft, Building2, Globe, Phone, Mail, Edit2, Trash2, Plus } from "l
 import { getCustomer, updateCustomer, deleteCustomer, getOpportunities, type Customer, type Opportunity } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
 import OpportunityCard from "@/components/OpportunityCard";
-import { canCreateCrmRecords } from "@/lib/permissions";
+import { canCreateCrmRecords, canManageCrmData } from "@/lib/permissions";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { isAdmin, profile } = useAuth();
   const canCreate = canCreateCrmRecords(profile);
+  const canManage = canManageCrmData(profile);
   const navigate = useNavigate();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [opps, setOpps] = useState<Opportunity[]>([]);
@@ -55,16 +56,20 @@ export default function CustomerDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
           {customer.industry && <p className="text-gray-500 text-sm">{customer.industry}</p>}
         </div>
-        {isAdmin && (
+        {(canManage || isAdmin) && (
           <div className="flex gap-2">
-            <button onClick={() => setEditing(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-              <Edit2 className="w-4 h-4" /> Edit
-            </button>
-            <button onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg">
-              <Trash2 className="w-4 h-4" /> Delete
-            </button>
+            {canManage && (
+              <button onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                <Edit2 className="w-4 h-4" /> Edit
+              </button>
+            )}
+            {isAdmin && (
+              <button onClick={handleDelete}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg">
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            )}
           </div>
         )}
       </div>
