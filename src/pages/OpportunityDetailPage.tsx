@@ -10,7 +10,8 @@ import {
 } from "@/lib/firestore";
 import {
   getOpportunityProducts, getOpportunityEvents, getMeetingNotes, getCatalogProducts,
-  setOpportunityProducts, syncOpportunityTags, logOpportunityEvent, PIPELINE_STAGES,
+  setOpportunityProducts, syncOpportunityTags, logOpportunityEvent, moveOpportunityStage,
+  opportunityEventAt,
   type OpportunityProduct, type OpportunityEvent, type MeetingNote, type CatalogProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
@@ -19,14 +20,16 @@ import StatusBadge from "@/components/StatusBadge";
 import FollowUpBadge from "@/components/FollowUpBadge";
 import PocTracker from "@/components/PocTracker";
 import TagAutocomplete from "@/components/TagAutocomplete";
+import StageMoveDialog from "@/components/StageMoveDialog";
 import {
-  getFollowUpStatus, formatDate, formatTimeAgo, ACTIVITY_TYPES, CURRENCIES,
+  getFollowUpStatus, formatDate, formatDateTime, ACTIVITY_TYPES, CURRENCIES,
   PIPELINE_STAGE_LABELS, COUNTRIES, REGIONS,
 } from "@/lib/utils";
 import {
   canEditOpportunity, canContributeToOpportunity, canChangeOwner, canChangeCoOwner,
   canAddPocUpdate, canReopenCompletedPoc, canChangeStage, canCreateCrmRecords,
   canDeleteRecord, ownerEligibleUsers, isAdmin as checkAdmin,
+  FORWARD_STAGES, stageMoveKind, type StageMoveKind,
 } from "@/lib/permissions";
 
 export default function OpportunityDetailPage() {
@@ -45,6 +48,10 @@ export default function OpportunityDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [stageMove, setStageMove] = useState<{
+    to: OpportunityStage;
+    kind: Exclude<StageMoveKind, "same" | "blocked">;
+  } | null>(null);
 
   const load = async () => {
     if (!id) return;
@@ -99,22 +106,29 @@ export default function OpportunityDetailPage() {
     navigate("/opportunities");
   };
 
-  const handleStageClick = async (stage: OpportunityStage) => {
-    if (!opp || !id || !canEdit) return;
+  const requestStageMove = (stage: OpportunityStage) => {
+    if (!opp || !id) return;
     if (!canChangeStage(opp.stage, stage, profile, canEdit)) {
-      alert("You cannot move this opportunity out of a closed stage.");
+      alert("Stages move one step forward. Only an admin can move a stage back.");
       return;
     }
-    const prev = opp.stage;
-    await updateOpportunity(id, { stage });
-    await logOpportunityEvent(id, {
-      type: stage === "CLOSED_WON" || stage === "CLOSED_LOST" ? "CLOSED" : "STAGE_CHANGED",
-      message: `Stage changed from ${PIPELINE_STAGE_LABELS[prev]} to ${PIPELINE_STAGE_LABELS[stage]}`,
+    const kind = stageMoveKind(opp.stage, stage);
+    if (kind === "same" || kind === "blocked") return;
+    setStageMove({ to: stage, kind });
+  };
+
+  const confirmStageMove = async (movedAt: Date) => {
+    if (!opp || !id || !stageMove) return;
+    await moveOpportunityStage({
+      opportunityId: id,
+      from: opp.stage,
+      to: stageMove.to,
+      movedAt,
       actorId: actor.id,
       actorName: actor.name,
-      meta: { from: prev, to: stage },
     });
-    load();
+    setStageMove(null);
+    await load();
   };
 
   const handleDeleteActivity = async (activityId: string) => {
@@ -171,26 +185,56 @@ export default function OpportunityDetailPage() {
       </div>
 
       {/* Stage stepper */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 overflow-x-auto">
         <div className="flex items-center gap-1 min-w-max">
-          {PIPELINE_STAGES.map((s, i) => {
-            const idx = PIPELINE_STAGES.indexOf(opp.stage);
+          {FORWARD_STAGES.map((s, i) => {
+            const currentIdx = FORWARD_STAGES.indexOf(opp.stage);
+            const idx = FORWARD_STAGES.indexOf(s);
             const active = s === opp.stage;
-            const done = PIPELINE_STAGES.indexOf(s) < idx;
+            const done = currentIdx >= 0 && idx < currentIdx;
+            const isNext = currentIdx >= 0 && idx === currentIdx + 1;
+            const isBack = opp.stage === "CLOSED_LOST" || (currentIdx >= 0 && idx < currentIdx);
+            const allowed = (isNext && canEdit) || (checkAdmin(profile) && isBack && !active);
             return (
               <div key={s} className="flex items-center">
-                <button type="button" disabled={!canEdit} onClick={() => handleStageClick(s)}
+                <button
+                  type="button"
+                  disabled={!allowed}
+                  onClick={() => requestStageMove(s)}
+                  title={allowed
+                    ? (isNext ? "Move one stage forward" : "Admin: move back")
+                    : "Only the next stage is available"}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     active ? "bg-blue-600 text-white border-blue-600"
                       : done ? "bg-blue-50 text-blue-700 border-blue-200"
                         : "bg-gray-50 text-gray-500 border-gray-200"
-                  } ${canEdit ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}>
+                  } ${allowed ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                >
                   {PIPELINE_STAGE_LABELS[s]}
                 </button>
-                {i < PIPELINE_STAGES.length - 1 && <div className="w-4 h-px bg-gray-200 mx-0.5" />}
+                {i < FORWARD_STAGES.length - 1 && <div className="w-4 h-px bg-gray-200 mx-0.5" />}
               </div>
             );
           })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
+            <button
+              type="button"
+              onClick={() => requestStageMove("CLOSED_LOST")}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-700 hover:bg-red-50"
+            >
+              Mark lost
+            </button>
+          )}
+          {opp.stage === "CLOSED_LOST" && (
+            <span className="text-xs font-medium text-red-700">Closed lost</span>
+          )}
+          {opp.stageEnteredAt && (
+            <span className="text-xs text-slate-500">
+              In this stage since {formatDateTime(opp.stageEnteredAt)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -329,13 +373,13 @@ export default function OpportunityDetailPage() {
             <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
               <History className="w-4 h-4" /> Activity History
             </h2>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <div className="space-y-2">
               {events.length === 0 ? (
                 <p className="text-xs text-gray-400">No audit events yet</p>
               ) : events.map((e) => (
                 <div key={e.id} className="text-xs border-b border-gray-50 pb-2">
                   <p className="text-gray-800">{e.message}</p>
-                  <p className="text-gray-400 mt-0.5">{e.actorName} · {formatTimeAgo(e.createdAt)}</p>
+                  <p className="text-gray-400 mt-0.5">{e.actorName} · {formatDateTime(opportunityEventAt(e))}</p>
                 </div>
               ))}
             </div>
@@ -348,6 +392,16 @@ export default function OpportunityDetailPage() {
           opportunityId={id!}
           onClose={() => setShowActivity(false)}
           onSaved={() => { setShowActivity(false); load(); }}
+        />
+      )}
+
+      {stageMove && opp && (
+        <StageMoveDialog
+          from={opp.stage}
+          to={stageMove.to}
+          kind={stageMove.kind}
+          onCancel={() => setStageMove(null)}
+          onConfirm={confirmStageMove}
         />
       )}
 
@@ -454,7 +508,6 @@ function EditOpportunityModal({
     title: opp.title,
     country: opp.country || "",
     region: opp.region || "",
-    stage: opp.stage,
     value: opp.value?.toString() || "",
     currency: opp.currency || "SAR",
     closeDate: opp.closeDate ? new Date(opp.closeDate).toISOString().slice(0, 10) : "",
@@ -502,7 +555,6 @@ function EditOpportunityModal({
         title: form.title,
         country: form.country,
         region: form.region || null,
-        stage: form.stage,
         value: form.value ? parseFloat(form.value) : null,
         currency: form.currency,
         closeDate: form.closeDate ? new Date(form.closeDate) : null,
@@ -540,14 +592,6 @@ function EditOpportunityModal({
           actorName: actor.name,
         });
       }
-      if (form.stage !== opp.stage) {
-        await logOpportunityEvent(opp.id, {
-          type: form.stage.startsWith("CLOSED") ? "CLOSED" : "STAGE_CHANGED",
-          message: `Stage → ${PIPELINE_STAGE_LABELS[form.stage]}`,
-          actorId: actor.id,
-          actorName: actor.name,
-        });
-      }
       await logOpportunityEvent(opp.id, {
         type: "UPDATED",
         message: "Opportunity details updated",
@@ -577,9 +621,9 @@ function EditOpportunityModal({
               {REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>
           </div>
-          <select value={form.stage} onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value as OpportunityStage }))} className={inputCls + " bg-white"}>
-            {PIPELINE_STAGES.map((s) => <option key={s} value={s}>{PIPELINE_STAGE_LABELS[s]}</option>)}
-          </select>
+          <p className="text-xs text-slate-500">
+            Stage is {PIPELINE_STAGE_LABELS[opp.stage]}. Move it one step at a time from the stage bar. Date and time are required, and only an admin can move back.
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <select disabled={!canOwner} value={form.ownerId} onChange={(e) => setForm((f) => ({ ...f, ownerId: e.target.value }))} className={inputCls + " bg-white disabled:opacity-60"}>
               {ownerEligibleUsers(users).map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}

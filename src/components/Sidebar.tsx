@@ -19,33 +19,27 @@ const navItems = [
 ];
 
 interface Props {
-  mobileOpen?: boolean;
+  open?: boolean;
   onClose?: () => void;
 }
 
-export default function Sidebar({ mobileOpen = false, onClose }: Props) {
+export default function Sidebar({ open = false, onClose }: Props) {
   const location = useLocation();
 
   useEffect(() => {
     onClose?.();
-    // Close mobile drawer after route changes (AppLayout also resets state)
+    // Close the floating menu after route changes (AppLayout also resets state)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  if (!open) return null;
+
   return (
     <>
-      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60">
-        <SidebarPanel />
+      <button type="button" className="nav-overlay" aria-label="Close menu" onClick={onClose} />
+      <div id="app-menu" className="sidebar-float" role="dialog" aria-label="Navigation">
+        <SidebarPanel onClose={onClose} />
       </div>
-
-      {mobileOpen && (
-        <>
-          <button type="button" className="nav-overlay lg:hidden" aria-label="Close menu" onClick={onClose} />
-          <div className="fixed inset-y-0 left-0 z-50 lg:hidden sidebar-drawer shadow-2xl">
-            <SidebarPanel onClose={onClose} />
-          </div>
-        </>
-      )}
     </>
   );
 }
@@ -74,7 +68,7 @@ function SidebarPanel({ onClose }: { onClose?: () => void }) {
     }`;
 
   return (
-    <aside className="flex h-full w-[min(17.5rem,85vw)] lg:w-60 flex-col bg-slate-950 text-slate-100 border-r border-slate-800/80">
+    <aside className="flex h-full w-full flex-col bg-slate-950 text-slate-100">
       <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-sky-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40 flex-shrink-0">
@@ -87,7 +81,7 @@ function SidebarPanel({ onClose }: { onClose?: () => void }) {
         </div>
         {onClose && (
           <button type="button" onClick={onClose}
-            className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
             aria-label="Close menu">
             <X className="w-5 h-5" />
           </button>

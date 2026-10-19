@@ -76,6 +76,8 @@ export interface Opportunity {
   lastActivityDate?: Date | null;
   /** Exit checklist for current stage (workspace). */
   stageGates?: { id: string; text: string; done: boolean; ownerLabel: string }[];
+  /** When the opportunity entered its current stage. */
+  stageEnteredAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -328,6 +330,7 @@ function docToOpportunity(snap: { id: string; data: () => Record<string, unknown
     stageGates: Array.isArray(d.stageGates)
       ? (d.stageGates as Opportunity["stageGates"])
       : [],
+    stageEnteredAt: d.stageEnteredAt ? toDate(d.stageEnteredAt as Timestamp) : null,
     createdAt: toDate(d.createdAt as Timestamp),
     updatedAt: toDate(d.updatedAt as Timestamp),
   };
@@ -362,6 +365,9 @@ export async function updateOpportunity(id: string, data: Partial<Opportunity>) 
   const payload: Record<string, unknown> = { ...data, updatedAt: serverTimestamp() };
   if (data.closeDate !== undefined) {
     payload.closeDate = data.closeDate ? Timestamp.fromDate(data.closeDate) : null;
+  }
+  if (data.stageEnteredAt !== undefined) {
+    payload.stageEnteredAt = data.stageEnteredAt ? Timestamp.fromDate(data.stageEnteredAt) : null;
   }
   if (data.owner || data.coOwner !== undefined) {
     const owner = data.owner;

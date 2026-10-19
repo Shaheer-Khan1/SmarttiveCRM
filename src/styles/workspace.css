@@ -31,7 +31,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: calc(100dvh - 53px);
+  height: calc(100dvh - 56px);
   min-height: 520px;
   background: var(--ws-ground);
   color: var(--ws-ink);
@@ -40,7 +40,7 @@
 
 @media (min-width: 1024px) {
   .ws-root {
-    height: 100dvh;
+    height: calc(100dvh - 56px);
   }
 }
 
@@ -329,8 +329,21 @@
 .ws-pipe .step {
   flex: 1;
   text-align: left;
-  padding-top: 6px;
+  padding: 6px 0 0;
+  border: none;
   border-top: 3px solid var(--ws-line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+.ws-pipe .step:not(:disabled) { cursor: pointer; }
+.ws-pipe .step:not(:disabled):hover .lbl { color: var(--ws-accent); }
+.ws-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 .ws-pipe .step .lbl {
   font-size: 10px;
@@ -637,7 +650,7 @@
 .ws-tl { display: flex; flex-direction: column; }
 .ws-ev {
   display: grid;
-  grid-template-columns: 60px 22px 1fr;
+  grid-template-columns: 84px 22px 1fr;
   gap: 0 12px;
   padding-bottom: 14px;
 }
@@ -1000,8 +1013,7 @@
 }
 
 @media (max-width: 560px) {
-  .ws-ev { grid-template-columns: 0 20px 1fr; }
-  .ws-ev .when { display: none; }
+  .ws-ev { grid-template-columns: 72px 20px 1fr; }
   .ws-facts { grid-template-columns: 1fr; }
   .ws-frow { grid-template-columns: 1fr; }
 }

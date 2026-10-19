@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, LayoutGrid, Columns3 } from "lucide-react";
-import { getOpportunities, getUsers, updateOpportunity, type Opportunity, type UserProfile, type OpportunityStage } from "@/lib/firestore";
+import { getOpportunities, getUsers, type Opportunity, type UserProfile, type OpportunityStage } from "@/lib/firestore";
 import {
-  getOpportunityProducts, getTags, logOpportunityEvent,
+  getOpportunityProducts, getTags, moveOpportunityStage,
   type OpportunityProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
 import FilterBar, { emptyFilters, type GlobalFilters } from "@/components/FilterBar";
 import PipelineBoard, { OppCard } from "@/components/PipelineBoard";
+import StageMoveDialog from "@/components/StageMoveDialog";
 import {
-  canEditOpportunity, canChangeStage, canCreateCrmRecords,
+  canEditOpportunity, canChangeStage, canCreateCrmRecords, stageMoveKind,
+  type StageMoveKind,
 } from "@/lib/permissions";
-import { PIPELINE_STAGE_LABELS } from "@/lib/utils";
 
 export default function OpportunitiesPage() {
   const { user, profile } = useAuth();
@@ -24,6 +25,11 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"board" | "list">("board");
   const [filters, setFilters] = useState<GlobalFilters>(emptyFilters());
+  const [stageMove, setStageMove] = useState<{
+    opp: Opportunity;
+    to: OpportunityStage;
+    kind: Exclude<StageMoveKind, "same" | "blocked">;
+  } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -64,17 +70,26 @@ export default function OpportunitiesPage() {
 
   const onStageChange = async (oppId: string, stage: OpportunityStage) => {
     const opp = opps.find((o) => o.id === oppId);
-    if (!opp) return;
-    const prev = opp.stage;
-    await updateOpportunity(oppId, { stage });
-    await logOpportunityEvent(oppId, {
-      type: stage.startsWith("CLOSED") ? "CLOSED" : "STAGE_CHANGED",
-      message: `Stage moved from ${PIPELINE_STAGE_LABELS[prev]} to ${PIPELINE_STAGE_LABELS[stage]}`,
+    if (!opp || opp.stage === stage) return;
+    const kind = stageMoveKind(opp.stage, stage);
+    if (kind === "blocked" || kind === "same") return;
+    setStageMove({ opp, to: stage, kind });
+  };
+
+  const confirmStageMove = async (movedAt: Date) => {
+    if (!stageMove) return;
+    await moveOpportunityStage({
+      opportunityId: stageMove.opp.id,
+      from: stageMove.opp.stage,
+      to: stageMove.to,
+      movedAt,
       actorId: user?.uid || "",
       actorName: profile?.name || "User",
-      meta: { from: prev, to: stage },
     });
-    setOpps((list) => list.map((o) => (o.id === oppId ? { ...o, stage } : o)));
+    setOpps((list) => list.map((o) => (
+      o.id === stageMove.opp.id ? { ...o, stage: stageMove.to, stageEnteredAt: movedAt } : o
+    )));
+    setStageMove(null);
   };
 
   return (
@@ -127,6 +142,16 @@ export default function OpportunitiesPage() {
             <p className="col-span-full text-center py-16 text-gray-400">No opportunities match filters</p>
           )}
         </div>
+      )}
+
+      {stageMove && (
+        <StageMoveDialog
+          from={stageMove.opp.stage}
+          to={stageMove.to}
+          kind={stageMove.kind}
+          onCancel={() => setStageMove(null)}
+          onConfirm={confirmStageMove}
+        />
       )}
     </div>
   );

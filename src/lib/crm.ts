@@ -5,10 +5,11 @@
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, Timestamp, serverTimestamp, writeBatch,
-  limit,
 } from "firebase/firestore";
+import { format } from "date-fns";
 import { db } from "./firebase";
-import type { AssignedPerson } from "./firestore";
+import { updateOpportunity, type AssignedPerson } from "./firestore";
+import { PIPELINE_STAGE_LABELS } from "./utils";
 
 function toDate(val: Timestamp | Date | null | undefined): Date {
   if (!val) return new Date();
@@ -374,9 +375,42 @@ export async function logOpportunityEvent(
   });
 }
 
+export function opportunityEventAt(event: Pick<OpportunityEvent, "createdAt" | "meta">): Date {
+  const raw = event.meta?.movedAt;
+  if (typeof raw === "string") {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return event.createdAt;
+}
+
+export async function moveOpportunityStage(input: {
+  opportunityId: string;
+  from: OpportunityStage;
+  to: OpportunityStage;
+  movedAt: Date;
+  actorId: string;
+  actorName: string;
+}) {
+  const fromLabel = PIPELINE_STAGE_LABELS[input.from] || input.from;
+  const toLabel = PIPELINE_STAGE_LABELS[input.to] || input.to;
+  const stamp = format(input.movedAt, "dd MMM yyyy, HH:mm");
+  await updateOpportunity(input.opportunityId, {
+    stage: input.to,
+    stageEnteredAt: input.movedAt,
+  });
+  await logOpportunityEvent(input.opportunityId, {
+    type: input.to === "CLOSED_WON" || input.to === "CLOSED_LOST" ? "CLOSED" : "STAGE_CHANGED",
+    message: `Stage moved from ${fromLabel} to ${toLabel} on ${stamp}`,
+    actorId: input.actorId,
+    actorName: input.actorName,
+    meta: { from: input.from, to: input.to, movedAt: input.movedAt.toISOString() },
+  });
+}
+
 export async function getOpportunityEvents(opportunityId: string): Promise<OpportunityEvent[]> {
   const snap = await getDocs(
-    query(collection(db, "opportunities", opportunityId, "events"), orderBy("createdAt", "desc"), limit(100)),
+    query(collection(db, "opportunities", opportunityId, "events"), orderBy("createdAt", "desc")),
   );
   return snap.docs.map((d) => ({
     id: d.id,

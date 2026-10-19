@@ -1,5 +1,5 @@
 import type { MeetingNote } from "./crm";
-import type { CalendarEvent, Opportunity, Product, UserProfile } from "./firestore";
+import type { CalendarEvent, Opportunity, OpportunityStage, Product, UserProfile } from "./firestore";
 
 export function isAdmin(profile: UserProfile | null | undefined): boolean {
   return profile?.role === "ADMIN";
@@ -131,21 +131,61 @@ export function canReopenCompletedPoc(profile: UserProfile | null | undefined): 
   return isAdmin(profile);
 }
 
-/** Leave terminal stages only as Admin/Manager. */
+/** Reopen a closed stage or move backward. Admin only. */
 export function canLeaveTerminalStage(profile: UserProfile | null | undefined): boolean {
-  return isAdmin(profile) || isManager(profile);
+  return isAdmin(profile);
 }
 
+/** Happy-path order. Closed Lost is an exit, not the step after Closed Won. */
+export const FORWARD_STAGES: OpportunityStage[] = [
+  "LEAD",
+  "QUALIFICATION",
+  "POC",
+  "PROPOSAL",
+  "NEGOTIATION",
+  "CLOSED_WON",
+];
+
+export function nextOpportunityStage(from: OpportunityStage): OpportunityStage | null {
+  const i = FORWARD_STAGES.indexOf(from);
+  if (i < 0 || i >= FORWARD_STAGES.length - 1) return null;
+  return FORWARD_STAGES[i + 1];
+}
+
+export type StageMoveKind = "same" | "forward" | "back" | "lost" | "blocked";
+
+export function stageMoveKind(from: OpportunityStage, to: OpportunityStage): StageMoveKind {
+  if (from === to) return "same";
+  if (to === "CLOSED_LOST") {
+    if (from === "CLOSED_LOST") return "same";
+    if (from === "CLOSED_WON") return "back";
+    return "lost";
+  }
+  if (from === "CLOSED_LOST") return "back";
+  const fromIdx = FORWARD_STAGES.indexOf(from);
+  const toIdx = FORWARD_STAGES.indexOf(to);
+  if (fromIdx < 0 || toIdx < 0) return "blocked";
+  if (toIdx === fromIdx + 1) return "forward";
+  if (toIdx < fromIdx) return "back";
+  return "blocked";
+}
+
+/**
+ * One step forward (or mark lost) for anyone who can edit the opportunity.
+ * Any move backward, including leaving Closed Won / Closed Lost, is admin-only.
+ * Skipping ahead is never allowed.
+ */
 export function canChangeStage(
   from: string,
   to: string,
   profile: UserProfile | null | undefined,
   canEdit: boolean,
 ): boolean {
-  if (from === to) return true;
-  const terminal = from === "CLOSED_WON" || from === "CLOSED_LOST";
-  if (terminal) return canLeaveTerminalStage(profile);
-  return canEdit;
+  const kind = stageMoveKind(from as OpportunityStage, to as OpportunityStage);
+  if (kind === "same") return true;
+  if (kind === "forward" || kind === "lost") return canEdit;
+  if (kind === "back") return isAdmin(profile);
+  return false;
 }
 
 export function isReadOnlyViewer(

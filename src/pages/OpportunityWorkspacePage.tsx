@@ -6,12 +6,13 @@ import {
 } from "date-fns";
 import { ExternalLink, Plus } from "lucide-react";
 import {
-  getOpportunities, getActivities, getUsers,
-  type Opportunity, type Activity, type UserProfile, type OpportunityStage,
+  getOpportunities, getActivities, getUsers, getComments,
+  type Opportunity, type Activity, type UserProfile, type OpportunityStage, type Comment,
 } from "@/lib/firestore";
 import {
   getOpportunityEvents, getMeetingNotes, getOpportunityProducts, logOpportunityEvent,
-  PIPELINE_STAGES, type OpportunityEvent, type MeetingNote, type OpportunityProduct,
+  moveOpportunityStage, opportunityEventAt,
+  type OpportunityEvent, type MeetingNote, type OpportunityProduct,
 } from "@/lib/crm";
 import {
   createOpportunityTask, updateOpportunityTask, saveStageGates, getOpportunityTasks,
@@ -20,8 +21,12 @@ import {
   type OpportunityTask, type StageGate, type TaskLane, type TaskStatus, type TaskSource,
 } from "@/lib/workspace";
 import { useAuth } from "@/context/AuthContext";
-import { PIPELINE_STAGE_LABELS, formatTimeAgo } from "@/lib/utils";
-import { canCreateCrmRecords, canEditOpportunity } from "@/lib/permissions";
+import { PIPELINE_STAGE_LABELS, formatDateTime } from "@/lib/utils";
+import {
+  canCreateCrmRecords, canEditOpportunity, isAdmin as checkAdmin,
+  FORWARD_STAGES, nextOpportunityStage, stageMoveKind, type StageMoveKind,
+} from "@/lib/permissions";
+import StageMoveDialog from "@/components/StageMoveDialog";
 import "@/styles/workspace.css";
 
 type TabId = "pulse" | "minutes" | "tasks" | "poc" | "calendar";
@@ -34,13 +39,14 @@ type StreamItem = {
   by: string;
 };
 
-const OPEN_STAGES: OpportunityStage[] = ["LEAD", "QUALIFICATION", "POC", "PROPOSAL", "NEGOTIATION"];
 const RAIL_FILTERS: { v: string; l: string }[] = [
   { v: "all", l: "All" },
   { v: "LEAD", l: "Lead" },
   { v: "POC", l: "PoC" },
   { v: "PROPOSAL", l: "Quote" },
   { v: "NEGOTIATION", l: "Nego" },
+  { v: "CLOSED_WON", l: "Won" },
+  { v: "CLOSED_LOST", l: "Lost" },
 ];
 
 export default function OpportunityWorkspacePage() {
@@ -62,8 +68,13 @@ export default function OpportunityWorkspacePage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [events, setEvents] = useState<OpportunityEvent[]>([]);
   const [notes, setNotes] = useState<MeetingNote[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [products, setProducts] = useState<OpportunityProduct[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [stageMove, setStageMove] = useState<{
+    to: OpportunityStage;
+    kind: Exclude<StageMoveKind, "same" | "blocked">;
+  } | null>(null);
 
   const [showTask, setShowTask] = useState(false);
   const [gateDraft, setGateDraft] = useState("");
@@ -72,18 +83,18 @@ export default function OpportunityWorkspacePage() {
 
   const loadList = useCallback(async () => {
     const [o, u] = await Promise.all([getOpportunities(), getUsers()]);
-    const open = o.filter((x) => OPEN_STAGES.includes(x.stage));
-    setOpps(open);
+    const sorted = [...o].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    setOpps(sorted);
     setUsers(u);
     const taskMap: Record<string, OpportunityTask[]> = {};
-    await Promise.all(open.map(async (opp) => {
+    await Promise.all(sorted.map(async (opp) => {
       try { taskMap[opp.id] = await getOpportunityTasks(opp.id); }
       catch { taskMap[opp.id] = []; }
     }));
     setTasksByOpp(taskMap);
     setLoading(false);
-    if (!params.get("id") && open[0]) {
-      setParams({ id: open[0].id }, { replace: true });
+    if (!params.get("id") && sorted[0]) {
+      setParams({ id: sorted[0].id }, { replace: true });
     }
   }, [params, setParams]);
 
@@ -105,6 +116,7 @@ export default function OpportunityWorkspacePage() {
         getMeetingNotes({ opportunityId: oppId }),
         getOpportunityProducts(oppId),
         getOpportunityTasks(oppId),
+        getComments(oppId),
       ]);
       const val = <T,>(i: number, fb: T): T =>
         settled[i].status === "fulfilled" ? (settled[i] as PromiseFulfilledResult<T>).value : fb;
@@ -113,6 +125,7 @@ export default function OpportunityWorkspacePage() {
       setNotes(val(2, []));
       setProducts(val(3, []));
       setTasksByOpp((m) => ({ ...m, [oppId]: val(4, []) }));
+      setComments(val(5, []));
     } finally {
       setDetailLoading(false);
     }
@@ -159,11 +172,21 @@ export default function OpportunityWorkspacePage() {
               : "comm";
       list.push({
         id: `ev-${e.id}`,
-        at: e.createdAt,
+        at: opportunityEventAt(e),
         kind,
         title: e.message,
         body: "",
         by: e.actorName,
+      });
+    });
+    comments.forEach((c) => {
+      list.push({
+        id: `comment-${c.id}`,
+        at: c.createdAt,
+        kind: "comm",
+        title: "Comment",
+        body: c.text,
+        by: c.authorName,
       });
     });
     tasks.forEach((t) => {
@@ -178,7 +201,7 @@ export default function OpportunityWorkspacePage() {
     });
     list.sort((a, b) => b.at.getTime() - a.at.getTime());
     return list;
-  }, [selected, activities, notes, events, tasks]);
+  }, [selected, activities, notes, events, tasks, comments]);
 
   const visibleStream = useMemo(() => {
     let list = streamItems;
@@ -296,6 +319,23 @@ export default function OpportunityWorkspacePage() {
     setTab("tasks");
   };
 
+  const confirmStageMove = async (movedAt: Date) => {
+    if (!selected || !stageMove || !user) return;
+    await moveOpportunityStage({
+      opportunityId: selected.id,
+      from: selected.stage,
+      to: stageMove.to,
+      movedAt,
+      actorId: user.uid,
+      actorName: profile?.name || "User",
+    });
+    setOpps((list) => list.map((o) => (
+      o.id === selected.id ? { ...o, stage: stageMove.to, stageEnteredAt: movedAt } : o
+    )));
+    setStageMove(null);
+    await loadDetail(selected.id);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -306,7 +346,14 @@ export default function OpportunityWorkspacePage() {
 
   const doneGates = gates.filter((g) => g.done).length;
   const gatePct = gates.length ? Math.round((doneGates / gates.length) * 100) : 0;
-  const stageIdx = selected ? PIPELINE_STAGES.indexOf(selected.stage) : -1;
+  const stageIdx = selected ? FORWARD_STAGES.indexOf(selected.stage) : -1;
+  const nextStage = selected ? nextOpportunityStage(selected.stage) : null;
+  const adminUser = checkAdmin(profile);
+  const backTargets: OpportunityStage[] = !selected || !adminUser
+    ? []
+    : selected.stage === "CLOSED_LOST"
+      ? [...FORWARD_STAGES]
+      : FORWARD_STAGES.filter((_, i) => stageIdx >= 0 && i < stageIdx);
   const overdue = overdueTaskCount(tasks);
   const pocProducts = products.filter((p) => p.requiresPoc);
   const pocDone = pocProducts.filter((p) => p.pocStatus === "COMPLETED").length;
@@ -334,7 +381,7 @@ export default function OpportunityWorkspacePage() {
       <div className="ws-body">
         <nav className="ws-rail" aria-label="Opportunities">
           <div className="ws-rail-head">
-            <span className="ws-eyebrow">Open opportunities</span>
+            <span className="ws-eyebrow">Opportunities</span>
             <span className="ws-eyebrow">{filteredRail.length}</span>
           </div>
           <div className="ws-rail-filter">
@@ -352,7 +399,7 @@ export default function OpportunityWorkspacePage() {
           </div>
           <div className="ws-rail-list">
             {filteredRail.length === 0 ? (
-              <p className="ws-empty" style={{ padding: "16px 8px" }}>No open opportunities</p>
+              <p className="ws-empty" style={{ padding: "16px 8px" }}>No opportunities</p>
             ) : filteredRail.map((o) => {
               const tlist = tasksByOpp[o.id] || [];
               const health = opportunityHealth(o, tlist);
@@ -395,18 +442,77 @@ export default function OpportunityWorkspacePage() {
                 </div>
 
                 <div className="ws-pipe" aria-label="Stage">
-                  {PIPELINE_STAGES.filter((s) => s !== "CLOSED_LOST").map((s) => {
-                    const idx = PIPELINE_STAGES.indexOf(s);
+                  {FORWARD_STAGES.map((s) => {
+                    const idx = FORWARD_STAGES.indexOf(s);
+                    const isNext = stageIdx >= 0 && idx === stageIdx + 1;
+                    const isBack = selected.stage === "CLOSED_LOST" || (stageIdx >= 0 && idx < stageIdx);
+                    const allowed = (isNext && canEdit) || (adminUser && isBack && s !== selected.stage);
+                    const kind = stageMoveKind(selected.stage, s);
                     return (
-                      <span
+                      <button
                         key={s}
+                        type="button"
                         className={`step ${idx < stageIdx ? "done" : ""} ${idx === stageIdx ? "now" : ""}`}
+                        disabled={!allowed}
+                        title={allowed
+                          ? (kind === "forward" ? "Move one stage forward" : "Admin: move back")
+                          : "Only the next stage is available"}
+                        onClick={() => {
+                          if (!allowed || kind === "same" || kind === "blocked") return;
+                          setStageMove({ to: s, kind });
+                        }}
                       >
                         <span className="lbl">{PIPELINE_STAGE_LABELS[s]}</span>
-                      </span>
+                      </button>
                     );
                   })}
                 </div>
+                <div className="ws-stage-actions">
+                  {nextStage && canEdit && (
+                    <button
+                      type="button"
+                      className="ws-solid"
+                      onClick={() => setStageMove({ to: nextStage, kind: "forward" })}
+                    >
+                      Move to {PIPELINE_STAGE_LABELS[nextStage]}
+                    </button>
+                  )}
+                  {canEdit && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
+                    <button
+                      type="button"
+                      className="ws-ghost"
+                      onClick={() => setStageMove({ to: "CLOSED_LOST", kind: "lost" })}
+                    >
+                      Mark lost
+                    </button>
+                  )}
+                  {backTargets.length > 0 && (
+                    <label className="ws-pane-note" style={{ display: "inline-flex", alignItems: "center", gap: 6, margin: 0 }}>
+                      Admin move back
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const to = e.target.value as OpportunityStage;
+                          if (to) setStageMove({ to, kind: "back" });
+                        }}
+                        style={{ border: "1px solid var(--ws-line)", borderRadius: 5, padding: "4px 8px", background: "white" }}
+                      >
+                        <option value="">Select stage</option>
+                        {backTargets.map((s) => (
+                          <option key={s} value={s}>{PIPELINE_STAGE_LABELS[s]}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                {selected.stageEnteredAt && (
+                  <p className="ws-pane-note" style={{ margin: 0 }}>
+                    In this stage since {formatDateTime(selected.stageEnteredAt)}
+                  </p>
+                )}
+                {selected.stage === "CLOSED_LOST" && (
+                  <p className="ws-pane-note" style={{ margin: 0 }}>Closed lost. Only an admin can move it back.</p>
+                )}
 
                 <div className="ws-card">
                   <div className="ws-facts">
@@ -498,7 +604,7 @@ export default function OpportunityWorkspacePage() {
               <section className="ws-stream" aria-label="Activity workspace">
                 <div className="ws-tabs" role="tablist">
                   {([
-                    { id: "pulse" as const, label: "Pulse", count: streamItems.length, alert: overdue },
+                    { id: "pulse" as const, label: "History", count: streamItems.length, alert: overdue },
                     { id: "minutes" as const, label: "Minutes", count: streamItems.filter((x) => x.kind === "minute").length },
                     { id: "tasks" as const, label: "Tasks", count: tasks.filter((t) => t.status !== "done").length, alert: overdue },
                     { id: "poc" as const, label: "PoC record", count: pocProducts.length },
@@ -530,13 +636,17 @@ export default function OpportunityWorkspacePage() {
 
                   {tab === "pulse" && (
                     <>
+                      <p className="ws-pane-note">
+                        Full history for this opportunity — notes, activities, comments, tasks, and every stage change, with date and time.
+                        {dayFilter ? "" : ` ${visibleStream.length} records.`}
+                      </p>
                       <AttentionBand tasks={attention} onGoTasks={() => setTab("tasks")} />
                       {dayFilter && (
                         <button type="button" className="ws-ghost" onClick={() => setDayFilter(null)}>
-                          Clear day filter · {dayFilter}
+                          Show all history · filtered to {dayFilter}
                         </button>
                       )}
-                      <StreamTimeline items={visibleStream} />
+                      <StreamTimeline items={visibleStream} empty="No history yet." />
                     </>
                   )}
 
@@ -586,6 +696,16 @@ export default function OpportunityWorkspacePage() {
           defaultOwnerId={selected.owner?.id || user?.uid || ""}
           onClose={() => setShowTask(false)}
           onCreate={(p) => void createTask(p)}
+        />
+      )}
+
+      {stageMove && selected && (
+        <StageMoveDialog
+          from={selected.stage}
+          to={stageMove.to}
+          kind={stageMove.kind}
+          onCancel={() => setStageMove(null)}
+          onConfirm={confirmStageMove}
         />
       )}
     </div>
@@ -658,7 +778,7 @@ function StreamTimeline({ items, empty = "Nothing matches." }: { items: StreamIt
       {items.map((e) => (
         <article key={e.id} className="ws-ev">
           <div className="when">
-            {format(e.at, "dd MMM")}
+            {format(e.at, "dd MMM yyyy")}
             <em>{format(e.at, "HH:mm")}</em>
           </div>
           <div className="spinecol">
@@ -668,7 +788,7 @@ function StreamTimeline({ items, empty = "Nothing matches." }: { items: StreamIt
           <div>
             <div>
               <span className="ttl">{e.title}</span>
-              <span className="by">{e.by} · {formatTimeAgo(e.at)}</span>
+              <span className="by">{e.by} · {formatDateTime(e.at)}</span>
             </div>
             {e.body && <p className="txt">{e.body}</p>}
           </div>

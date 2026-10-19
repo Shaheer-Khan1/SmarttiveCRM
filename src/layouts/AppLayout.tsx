@@ -1,23 +1,27 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { Menu, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
 import PendingAccessPage from "@/pages/PendingAccessPage";
 
 export default function AppLayout() {
-  const { user, loading, hasRole, profile } = useAuth();
+  const { user, loading, hasRole } = useAuth();
   const location = useLocation();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
-    setMobileNavOpen(false);
+    setNavOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [mobileNavOpen]);
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   if (loading) {
     return (
@@ -35,32 +39,27 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell">
-      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 lg:hidden border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-sky-500 flex items-center justify-center flex-shrink-0">
-              <TrendingUp className="w-4 h-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-display text-sm font-semibold text-slate-900 truncate">Smarttive</p>
-              <p className="text-[11px] text-slate-500 truncate">{profile?.name || "CRM"}</p>
-            </div>
-          </div>
-        </div>
+      <header className="app-topbar">
+        <button
+          type="button"
+          className="app-logo-btn"
+          aria-expanded={navOpen}
+          aria-controls="app-menu"
+          onClick={() => setNavOpen((open) => !open)}
+        >
+          <span className="app-logo-mark" aria-hidden>
+            <TrendingUp className="w-4 h-4 text-white" />
+          </span>
+          <span className="text-left">
+            <span className="block font-display text-sm font-semibold leading-none text-slate-900">Smarttive</span>
+            <span className="block text-[11px] text-slate-500 mt-1">CRM</span>
+          </span>
+        </button>
       </header>
 
-      <main className="app-main lg:ml-60">
+      <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
+
+      <main className="app-main">
         <div className={isWorkspace ? "app-content app-content--bleed" : "app-content"}>
           <Outlet />
         </div>
