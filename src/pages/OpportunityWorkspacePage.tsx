@@ -11,7 +11,7 @@ import {
 } from "@/lib/firestore";
 import {
   getOpportunityEvents, getMeetingNotes, getOpportunityProducts, logOpportunityEvent,
-  moveOpportunityStage, opportunityEventAt,
+  moveOpportunityStage, opportunityEventAt, stageAtTime,
   type OpportunityEvent, type MeetingNote, type OpportunityProduct,
 } from "@/lib/crm";
 import {
@@ -37,6 +37,7 @@ type StreamItem = {
   title: string;
   body: string;
   by: string;
+  stageLabel?: string;
 };
 
 const RAIL_FILTERS: { v: string; l: string }[] = [
@@ -180,6 +181,7 @@ export default function OpportunityWorkspacePage() {
       });
     });
     comments.forEach((c) => {
+      const stage = c.stage || stageAtTime(c.createdAt, events, selected.stage);
       list.push({
         id: `comment-${c.id}`,
         at: c.createdAt,
@@ -187,6 +189,7 @@ export default function OpportunityWorkspacePage() {
         title: "Comment",
         body: c.text,
         by: c.authorName,
+        stageLabel: PIPELINE_STAGE_LABELS[stage] || stage,
       });
     });
     tasks.forEach((t) => {
@@ -788,6 +791,7 @@ function StreamTimeline({ items, empty = "Nothing matches." }: { items: StreamIt
           <div>
             <div>
               <span className="ttl">{e.title}</span>
+              {e.stageLabel && <span className="ws-pill">{e.stageLabel}</span>}
               <span className="by">{e.by} · {formatDateTime(e.at)}</span>
             </div>
             {e.body && <p className="txt">{e.body}</p>}

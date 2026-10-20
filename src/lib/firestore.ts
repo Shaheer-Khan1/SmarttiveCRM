@@ -88,6 +88,8 @@ export interface Comment {
   text: string;
   authorId: string;
   authorName: string;
+  /** Pipeline stage the opportunity was in when this comment was posted. */
+  stage?: OpportunityStage | null;
   createdAt: Date;
 }
 
@@ -475,13 +477,20 @@ export async function getComments(opportunityId: string): Promise<Comment[]> {
     text: d.data().text as string,
     authorId: d.data().authorId as string,
     authorName: d.data().authorName as string,
+    stage: (d.data().stage as OpportunityStage) || null,
     createdAt: toDate(d.data().createdAt as Timestamp),
   }));
 }
 
-export async function addComment(opportunityId: string, text: string, authorId: string, authorName: string): Promise<string> {
+export async function addComment(
+  opportunityId: string,
+  text: string,
+  authorId: string,
+  authorName: string,
+  stage: OpportunityStage,
+): Promise<string> {
   const ref = await addDoc(collection(db, "opportunities", opportunityId, "comments"), {
-    text, authorId, authorName, createdAt: serverTimestamp(),
+    text, authorId, authorName, stage, createdAt: serverTimestamp(),
   });
   return ref.id;
 }

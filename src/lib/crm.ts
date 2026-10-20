@@ -384,6 +384,56 @@ export function opportunityEventAt(event: Pick<OpportunityEvent, "createdAt" | "
   return event.createdAt;
 }
 
+function labelToStage(label: string): OpportunityStage | null {
+  const trimmed = label.trim();
+  if ((PIPELINE_STAGES as string[]).includes(trimmed)) return trimmed as OpportunityStage;
+  const lower = trimmed.toLowerCase();
+  for (const [key, value] of Object.entries(PIPELINE_STAGE_LABELS)) {
+    if (value.toLowerCase() === lower) return key as OpportunityStage;
+  }
+  return null;
+}
+
+/**
+ * Stage the opportunity was in at `at`.
+ * Uses stage-change history so a comment posted in Lead still reads as Lead after a later move.
+ */
+export function stageAtTime(
+  at: Date,
+  events: OpportunityEvent[],
+  currentStage: OpportunityStage,
+): OpportunityStage {
+  const transitions = events
+    .filter((e) => e.type === "STAGE_CHANGED" || e.type === "CLOSED")
+    .map((e) => {
+      const metaFrom = typeof e.meta?.from === "string" ? labelToStage(e.meta.from) : null;
+      const metaTo = typeof e.meta?.to === "string" ? labelToStage(e.meta.to) : null;
+      let from = metaFrom;
+      let to = metaTo;
+      if (!to) {
+        const moved = e.message.match(/from\s+(.+?)\s+to\s+(.+?)(?:\s+on\s+|$)/i);
+        if (moved) {
+          from = from || labelToStage(moved[1]);
+          to = labelToStage(moved[2]);
+        } else {
+          const arrow = e.message.match(/Stage\s*→\s*(.+)$/i);
+          if (arrow) to = labelToStage(arrow[1]);
+        }
+      }
+      return { at: opportunityEventAt(e), from, to };
+    })
+    .filter((t): t is { at: Date; from: OpportunityStage | null; to: OpportunityStage } => !!t.to)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+
+  if (!transitions.length) return currentStage;
+
+  let stage: OpportunityStage = transitions[0].from || currentStage;
+  for (const t of transitions) {
+    if (t.at.getTime() <= at.getTime()) stage = t.to;
+  }
+  return stage;
+}
+
 export async function moveOpportunityStage(input: {
   opportunityId: string;
   from: OpportunityStage;

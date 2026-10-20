@@ -11,7 +11,7 @@ import {
 import {
   getOpportunityProducts, getOpportunityEvents, getMeetingNotes, getCatalogProducts,
   setOpportunityProducts, syncOpportunityTags, logOpportunityEvent, moveOpportunityStage,
-  opportunityEventAt,
+  opportunityEventAt, stageAtTime,
   type OpportunityProduct, type OpportunityEvent, type MeetingNote, type CatalogProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
@@ -149,6 +149,10 @@ export default function OpportunityDetailPage() {
   const followUp = getFollowUpStatus(opp.lastActivityDate || null);
   const pocNeeded = products.filter((p) => p.requiresPoc);
   const pocDone = pocNeeded.filter((p) => p.pocStatus === "COMPLETED").length;
+  const stagedComments: Comment[] = comments.map((c) => ({
+    ...c,
+    stage: c.stage || stageAtTime(c.createdAt, events, opp.stage),
+  }));
 
   return (
     <div className="space-y-6">
@@ -326,21 +330,32 @@ export default function OpportunityDetailPage() {
             </div>
             <ActivityTimeline
               activities={activities}
+              comments={stagedComments}
               canDeleteActivity={(a) => canDeleteRecord(profile, a.createdById, user?.uid)}
               onDelete={handleDeleteActivity}
             />
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-900">Comments</h2>
-            {comments.length === 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Comments</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Each comment keeps the stage it was posted in, including after the opportunity moves on.</p>
+            </div>
+            {stagedComments.length === 0 && (
               <p className="text-sm text-gray-400">No comments yet</p>
             )}
             <div className="space-y-2">
-              {comments.map((c) => (
+              {stagedComments.map((c) => (
                 <div key={c.id} className="text-sm border-l-2 border-gray-200 pl-3">
                   <div className="flex justify-between gap-2">
-                    <span className="font-medium">{c.authorName}</span>
+                    <span className="font-medium">
+                      {c.authorName}
+                      {c.stage && (
+                        <span className="ml-2 text-xs font-normal text-slate-500">
+                          {PIPELINE_STAGE_LABELS[c.stage] || c.stage}
+                        </span>
+                      )}
+                    </span>
                     {canDeleteRecord(profile, c.authorId, user?.uid) && (
                       <button onClick={async () => { await deleteComment(id!, c.id); load(); }} className="text-xs text-red-500">Delete</button>
                     )}
@@ -356,7 +371,7 @@ export default function OpportunityDetailPage() {
                 <button
                   onClick={async () => {
                     if (!newComment.trim() || !user) return;
-                    await addComment(id!, newComment.trim(), user.uid, profile?.name || "User");
+                    await addComment(id!, newComment.trim(), user.uid, profile?.name || "User", opp.stage);
                     setNewComment("");
                     load();
                   }}
