@@ -7,8 +7,11 @@ import {
   PIPELINE_STAGES, type CatalogProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
-import { COUNTRIES, REGIONS, CURRENCIES, PIPELINE_STAGE_LABELS } from "@/lib/utils";
+import {
+  REGIONS, CURRENCIES, PIPELINE_STAGE_LABELS, countriesForRegion, defaultCloseDateInput, fromDateAndTime,
+} from "@/lib/utils";
 import TagAutocomplete from "@/components/TagAutocomplete";
+import ProductMultiSelect from "@/components/ProductMultiSelect";
 import { canCreateCrmRecords, ownerEligibleUsers } from "@/lib/permissions";
 
 interface SelectedProduct {
@@ -37,8 +40,9 @@ export default function NewOpportunityPage() {
     region: "GCC",
     stage: "LEAD" as OpportunityStage,
     value: "",
-    currency: "SAR",
-    closeDate: "",
+    currency: "USD",
+    closeDate: defaultCloseDateInput(),
+    partner: "",
     notes: "",
     tags: [] as string[],
     ownerId: "",
@@ -70,17 +74,6 @@ export default function NewOpportunityPage() {
     return <Navigate to="/opportunities" replace />;
   }
 
-  const toggleProduct = (p: CatalogProduct) => {
-    setForm((f) => {
-      const exists = f.products.find((x) => x.productId === p.id);
-      if (exists) return { ...f, products: f.products.filter((x) => x.productId !== p.id) };
-      return {
-        ...f,
-        products: [...f.products, { productId: p.id, productName: p.name, color: p.color, requiresPoc: false }],
-      };
-    });
-  };
-
   const setRequiresPoc = (productId: string, requiresPoc: boolean) => {
     setForm((f) => ({
       ...f,
@@ -94,6 +87,7 @@ export default function NewOpportunityPage() {
     if (!form.title.trim()) return setError("Opportunity name is required");
     if (!form.country.trim()) return setError("Country is required");
     if (!form.customerId) return setError("Customer is required");
+    if (!form.products.length) return setError("Select at least one product");
 
     const ownerUser = salesUsers.find((u) => u.id === form.ownerId);
     if (!ownerUser) return setError("Owner is required and must be an Admin or Manager");
@@ -115,9 +109,10 @@ export default function NewOpportunityPage() {
         stage: form.stage,
         country: form.country,
         region: form.region || null,
-        closeDate: form.closeDate ? new Date(form.closeDate) : null,
+        closeDate: form.closeDate ? fromDateAndTime(form.closeDate, "12:00") : null,
         value: form.value ? parseFloat(form.value) : null,
         currency: form.currency,
+        partner: form.partner.trim(),
         notes: form.notes,
         tags: form.tags,
         owner,
@@ -173,17 +168,36 @@ export default function NewOpportunityPage() {
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Country *">
-            <select required value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={inputCls + " bg-white"}>
-              {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </Field>
           <Field label="Region">
-            <select value={form.region} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))} className={inputCls + " bg-white"}>
+            <select
+              value={form.region}
+              onChange={(e) => {
+                const region = e.target.value;
+                const options = countriesForRegion(region);
+                setForm((f) => ({
+                  ...f,
+                  region,
+                  country: options.some((c) => c.name === f.country) ? f.country : (options[0]?.name || ""),
+                }));
+              }}
+              className={inputCls + " bg-white"}
+            >
               {REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>
           </Field>
+          <Field label="Country *">
+            <select required value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={inputCls + " bg-white"}>
+              {countriesForRegion(form.region, form.country).map((c) => (
+                <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
+              ))}
+            </select>
+          </Field>
         </div>
+
+        <Field label="Partner">
+          <input value={form.partner} onChange={(e) => setForm((f) => ({ ...f, partner: e.target.value }))}
+            className={inputCls} placeholder="Partner company or contact" />
+        </Field>
 
         <Field label="Customer *">
           <select required value={form.customerId} onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))} className={inputCls + " bg-white"}>
@@ -230,32 +244,24 @@ export default function NewOpportunityPage() {
           <p className="text-xs text-amber-600">No Admin/Manager users available to assign as Owner.</p>
         )}
 
-        <Field label="Products (optional)">
-          {catalog.length === 0 ? (
-            <p className="text-xs text-amber-600">No active catalog products. Admin can add them under Admin → Products.</p>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                {catalog.map((p) => {
-                  const selected = form.products.some((x) => x.productId === p.id);
-                  return (
-                    <button key={p.id} type="button" onClick={() => toggleProduct(p)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium border ${selected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200"}`}
-                      style={selected ? { background: p.color } : undefined}>
-                      {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {form.products.map((p) => (
-                <label key={p.productId} className="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" checked={p.requiresPoc} onChange={(e) => setRequiresPoc(p.productId, e.target.checked)} />
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
-                  {p.productName} — Requires PoC
-                </label>
-              ))}
-            </div>
+        <Field label="Products *">
+          <ProductMultiSelect
+            catalog={catalog}
+            value={form.products}
+            onChange={(products) => setForm((f) => ({ ...f, products }))}
+          />
+          {catalog.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1">No active catalog products. Admin can add them under Admin → Products.</p>
           )}
+          <div className="space-y-1 mt-2">
+            {form.products.map((p) => (
+              <label key={p.productId} className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={p.requiresPoc} onChange={(e) => setRequiresPoc(p.productId, e.target.checked)} />
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
+                {p.productName} — Requires PoC
+              </label>
+            ))}
+          </div>
         </Field>
 
         <Field label="Tags">

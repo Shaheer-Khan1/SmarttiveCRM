@@ -8,7 +8,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { PIPELINE_STAGES, TERMINAL_STAGES, type OpportunityStage } from "@/lib/crm";
 import type { Opportunity } from "@/lib/firestore";
 import type { OpportunityProduct } from "@/lib/crm";
-import { PIPELINE_STAGE_LABELS, formatDate } from "@/lib/utils";
+import { PIPELINE_STAGE_LABELS, formatDate, byOpportunityTitle, countryFlag } from "@/lib/utils";
+import ProductChips from "@/components/ProductChips";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -29,6 +30,9 @@ export default function PipelineBoard({ opportunities, productsByOpp, canMove, o
       const stage = o.stage || "LEAD";
       (map[stage] || (map[stage] = [])).push(o);
     }
+    for (const stage of PIPELINE_STAGES) {
+      map[stage].sort(byOpportunityTitle);
+    }
     return map;
   }, [opportunities]);
 
@@ -48,7 +52,7 @@ export default function PipelineBoard({ opportunities, productsByOpp, canMove, o
     const opp = opportunities.find((o) => o.id === oppId);
     if (!opp || opp.stage === toStage) return;
     if (!canMove(opp, toStage)) {
-      window.alert("Opportunities move one stage at a time. Only an admin can move a stage back.");
+      window.alert("Only the owner can move an opportunity to the next stage. Only an admin can move a stage back.");
       return;
     }
     await onStageChange(oppId, toStage);
@@ -146,16 +150,15 @@ export function OppCard({
       <div className="flex items-center gap-1.5 mb-2">
         <Avatar name={opp.owner?.name} />
         {opp.coOwner && <Avatar name={opp.coOwner.name} />}
-        <span className="text-[11px] text-gray-500 ml-1 truncate">{opp.country || "—"}</span>
+        <span className="text-[11px] text-gray-500 ml-1 truncate">
+          {countryFlag(opp.country) ? `${countryFlag(opp.country)} ` : ""}{opp.country || "—"}
+        </span>
       </div>
       {opp.closeDate && (
         <p className="text-[11px] text-gray-500 mb-2">Close {formatDate(opp.closeDate)}</p>
       )}
       <div className="flex flex-wrap gap-1 mb-2">
-        {products.slice(0, 4).map((p) => (
-          <span key={p.id} className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
-            style={{ background: p.color }}>{p.productName}</span>
-        ))}
+        <ProductChips products={products} solution={opp.solution} />
         {engagementTag && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
             {engagementTag}

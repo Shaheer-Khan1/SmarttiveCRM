@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Building2, Target, Activity, Loader2 } from "lucide-react";
 import { searchAll, type Customer, type Opportunity, type Activity as ActivityType } from "@/lib/firestore";
+import { countryFlag } from "@/lib/utils";
 import { formatDate, getActivityTypeIcon } from "@/lib/utils";
 import StatusBadge from "@/components/StatusBadge";
 
@@ -101,7 +102,11 @@ export default function SearchPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="font-medium text-gray-900 group-hover:text-blue-600">{opp.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{opp.customerName}{opp.solution && ` · ${opp.solution}`}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {opp.customerName}
+                          {opp.country ? ` · ${countryFlag(opp.country)} ${opp.country}` : ""}
+                          {opp.solution ? ` · ${opp.solution}` : ""}
+                        </p>
                       </div>
                       <StatusBadge status={opp.stage} />
                     </div>

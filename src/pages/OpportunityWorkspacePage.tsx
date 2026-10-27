@@ -21,12 +21,16 @@ import {
   type OpportunityTask, type StageGate, type TaskLane, type TaskStatus, type TaskSource,
 } from "@/lib/workspace";
 import { useAuth } from "@/context/AuthContext";
-import { PIPELINE_STAGE_LABELS, formatDateTime } from "@/lib/utils";
+import {
+  PIPELINE_STAGE_LABELS, formatDateTime, countryFlag, byOpportunityTitle,
+  getFollowUpStatus, followUpReason, RED_FLAG_EXPLANATION,
+} from "@/lib/utils";
 import {
   canCreateCrmRecords, canEditOpportunity, isAdmin as checkAdmin,
   FORWARD_STAGES, nextOpportunityStage, stageMoveKind, type StageMoveKind,
 } from "@/lib/permissions";
 import StageMoveDialog from "@/components/StageMoveDialog";
+import OpportunityTimeTracker from "@/components/OpportunityTimeTracker";
 import "@/styles/workspace.css";
 
 type TabId = "pulse" | "minutes" | "tasks" | "poc" | "calendar";
@@ -137,9 +141,12 @@ export default function OpportunityWorkspacePage() {
   }, [selected?.id, loadDetail]);
 
   const filteredRail = useMemo(() => {
-    if (railStage === "all") return opps;
-    if (railStage === "LEAD") return opps.filter((o) => o.stage === "LEAD" || o.stage === "QUALIFICATION");
-    return opps.filter((o) => o.stage === railStage);
+    const list = railStage === "all"
+      ? opps
+      : railStage === "LEAD"
+        ? opps.filter((o) => o.stage === "LEAD" || o.stage === "QUALIFICATION")
+        : opps.filter((o) => o.stage === railStage);
+    return [...list].sort(byOpportunityTitle);
   }, [opps, railStage]);
 
   const streamItems: StreamItem[] = useMemo(() => {
@@ -166,6 +173,7 @@ export default function OpportunityWorkspacePage() {
       });
     });
     events.forEach((e) => {
+      if (e.message.startsWith("Activity logged:") || e.message.startsWith("File uploaded on activity:")) return;
       const kind: StreamItem["kind"] =
         e.type.includes("STAGE") || e.type === "CLOSED" ? "stage"
           : e.type.includes("POC") ? "poc"
@@ -223,6 +231,7 @@ export default function OpportunityWorkspacePage() {
   }, [tasks]);
 
   const canEdit = canEditOpportunity(selected, profile, user?.uid);
+  const isOwner = !!selected && selected.owner?.id === user?.uid;
   const gates = parseStageGates(selected?.stageGates);
 
   const selectOpp = (id: string) => {
@@ -419,7 +428,8 @@ export default function OpportunityWorkspacePage() {
                   <span>
                     <span className="name">{o.title}</span>
                     <span className="sub">
-                      {PIPELINE_STAGE_LABELS[o.stage] || o.stage}
+                      {countryFlag(o.country)} {PIPELINE_STAGE_LABELS[o.stage] || o.stage}
+                      {o.solution ? ` · ${o.solution}` : ""}
                       {o.value != null && <b>{o.currency} {o.value.toLocaleString()}</b>}
                       {od > 0 && <span className="ws-od-badge">{od} overdue</span>}
                     </span>
@@ -439,8 +449,13 @@ export default function OpportunityWorkspacePage() {
                   <h1 className="ws-opp-title">{selected.title}</h1>
                   <div className="ws-opp-meta">
                     <span>{selected.customerName}</span>
-                    {selected.solution && <span className="ws-tag accent">{selected.solution}</span>}
-                    {selected.country && <span className="ws-tag">{selected.country}</span>}
+                    {selected.country && (
+                      <span className="ws-tag">{countryFlag(selected.country)} {selected.country}</span>
+                    )}
+                    {(selected.solution || "").split(",").map((s) => s.trim()).filter(Boolean).map((name) => (
+                      <span key={name} className="ws-tag accent">{name}</span>
+                    ))}
+                    {selected.partner && <span className="ws-tag">Partner · {selected.partner}</span>}
                   </div>
                 </div>
 
@@ -449,7 +464,7 @@ export default function OpportunityWorkspacePage() {
                     const idx = FORWARD_STAGES.indexOf(s);
                     const isNext = stageIdx >= 0 && idx === stageIdx + 1;
                     const isBack = selected.stage === "CLOSED_LOST" || (stageIdx >= 0 && idx < stageIdx);
-                    const allowed = (isNext && canEdit) || (adminUser && isBack && s !== selected.stage);
+                    const allowed = (isNext && isOwner) || (adminUser && isBack && s !== selected.stage);
                     const kind = stageMoveKind(selected.stage, s);
                     return (
                       <button
@@ -458,8 +473,8 @@ export default function OpportunityWorkspacePage() {
                         className={`step ${idx < stageIdx ? "done" : ""} ${idx === stageIdx ? "now" : ""}`}
                         disabled={!allowed}
                         title={allowed
-                          ? (kind === "forward" ? "Move one stage forward" : "Admin: move back")
-                          : "Only the next stage is available"}
+                          ? (kind === "forward" ? "Owner: move one stage forward" : "Admin: move back")
+                          : isNext ? "Only the owner can move this to the next stage" : "Only the next stage is available"}
                         onClick={() => {
                           if (!allowed || kind === "same" || kind === "blocked") return;
                           setStageMove({ to: s, kind });
@@ -470,8 +485,13 @@ export default function OpportunityWorkspacePage() {
                     );
                   })}
                 </div>
+                {!isOwner && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
+                  <p className="text-xs text-slate-400">
+                    Only the owner{selected.owner?.name ? `, ${selected.owner.name},` : ""} can move this to the next stage.
+                  </p>
+                )}
                 <div className="ws-stage-actions">
-                  {nextStage && canEdit && (
+                  {nextStage && isOwner && (
                     <button
                       type="button"
                       className="ws-solid"
@@ -480,7 +500,7 @@ export default function OpportunityWorkspacePage() {
                       Move to {PIPELINE_STAGE_LABELS[nextStage]}
                     </button>
                   )}
-                  {canEdit && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
+                  {isOwner && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
                     <button
                       type="button"
                       className="ws-ghost"
@@ -516,6 +536,13 @@ export default function OpportunityWorkspacePage() {
                 {selected.stage === "CLOSED_LOST" && (
                   <p className="ws-pane-note" style={{ margin: 0 }}>Closed lost. Only an admin can move it back.</p>
                 )}
+                {(getFollowUpStatus(selected.lastActivityDate || null) === "RED_FLAG"
+                  || getFollowUpStatus(selected.lastActivityDate || null) === "WARNING") && (
+                  <p className="ws-pane-note" style={{ margin: 0 }}>
+                    {followUpReason(selected.lastActivityDate || null)} {RED_FLAG_EXPLANATION}
+                  </p>
+                )}
+                <OpportunityTimeTracker opp={selected} />
 
                 <div className="ws-card">
                   <div className="ws-facts">

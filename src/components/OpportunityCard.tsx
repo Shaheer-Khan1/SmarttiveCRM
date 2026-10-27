@@ -2,12 +2,21 @@ import { useNavigate } from "react-router-dom";
 import { Calendar, Users } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import FollowUpBadge from "./FollowUpBadge";
-import { getFollowUpStatus, formatTimeAgo, formatDate } from "@/lib/utils";
+import { getFollowUpStatus, followUpReason, formatTimeAgo, formatDate, countryFlag } from "@/lib/utils";
 import type { Opportunity } from "@/lib/firestore";
+import ProductChips from "@/components/ProductChips";
+import type { OpportunityProduct } from "@/lib/crm";
 
-export default function OpportunityCard({ opp }: { opp: Opportunity }) {
+export default function OpportunityCard({
+  opp,
+  products,
+}: {
+  opp: Opportunity;
+  products?: OpportunityProduct[];
+}) {
   const navigate = useNavigate();
   const followUpStatus = getFollowUpStatus(opp.lastActivityDate || null);
+  const flag = countryFlag(opp.country);
 
   return (
     <div onClick={() => navigate(`/opportunities/${opp.id}`)}
@@ -17,13 +26,19 @@ export default function OpportunityCard({ opp }: { opp: Opportunity }) {
           <h3 className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors line-clamp-2">
             {opp.title}
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5 truncate">{opp.customerName}{opp.country ? ` · ${opp.country}` : ""}</p>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">
+            {opp.customerName}
+            {opp.country ? ` · ${flag ? `${flag} ` : ""}${opp.country}` : ""}
+          </p>
         </div>
         <StatusBadge status={opp.stage} />
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         {followUpStatus !== "NO_ACTIVITY" && <FollowUpBadge status={followUpStatus} />}
+        {(followUpStatus === "RED_FLAG" || followUpStatus === "WARNING") && (
+          <p className="text-[11px] text-slate-500 basis-full">{followUpReason(opp.lastActivityDate || null)}</p>
+        )}
         {opp.value != null && (
           <span className="text-xs text-gray-500">{opp.value.toLocaleString()} {opp.currency}</span>
         )}
@@ -45,6 +60,10 @@ export default function OpportunityCard({ opp }: { opp: Opportunity }) {
         ) : opp.lastActivityDate ? (
           <span>{formatTimeAgo(opp.lastActivityDate)}</span>
         ) : null}
+      </div>
+
+      <div className="mt-3">
+        <ProductChips products={products} solution={opp.solution} />
       </div>
 
       {opp.tags.length > 0 && (

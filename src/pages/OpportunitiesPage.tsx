@@ -3,17 +3,18 @@ import { Link } from "react-router-dom";
 import { Plus, LayoutGrid, Columns3 } from "lucide-react";
 import { getOpportunities, getUsers, type Opportunity, type UserProfile, type OpportunityStage } from "@/lib/firestore";
 import {
-  getOpportunityProducts, getTags, moveOpportunityStage,
+  getOpportunityProducts, getTags, getCatalogProducts, moveOpportunityStage,
   type OpportunityProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
-import FilterBar, { emptyFilters, type GlobalFilters } from "@/components/FilterBar";
+import FilterBar, { emptyFilters, opportunityMatchesFilters, type GlobalFilters } from "@/components/FilterBar";
 import PipelineBoard, { OppCard } from "@/components/PipelineBoard";
 import StageMoveDialog from "@/components/StageMoveDialog";
 import {
-  canEditOpportunity, canChangeStage, canCreateCrmRecords, stageMoveKind,
+  canChangeStage, canCreateCrmRecords, stageMoveKind,
   type StageMoveKind,
 } from "@/lib/permissions";
+import { byOpportunityTitle } from "@/lib/utils";
 
 export default function OpportunitiesPage() {
   const { user, profile } = useAuth();
@@ -21,6 +22,7 @@ export default function OpportunitiesPage() {
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
+  const [productNames, setProductNames] = useState<string[]>([]);
   const [productsByOpp, setProductsByOpp] = useState<Record<string, OpportunityProduct[]>>({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"board" | "list">("board");
@@ -33,10 +35,13 @@ export default function OpportunitiesPage() {
 
   const load = async () => {
     setLoading(true);
-    const [o, u, t] = await Promise.all([getOpportunities(), getUsers(), getTags()]);
+    const [o, u, t, catalog] = await Promise.all([
+      getOpportunities(), getUsers(), getTags(), getCatalogProducts({ activeOnly: true }),
+    ]);
     setOpps(o);
     setUsers(u);
     setTagNames(t.map((x) => x.name));
+    setProductNames(catalog.map((p) => p.name).sort((a, b) => a.localeCompare(b)));
     const map: Record<string, OpportunityProduct[]> = {};
     await Promise.all(o.map(async (opp) => {
       map[opp.id] = await getOpportunityProducts(opp.id);
@@ -48,24 +53,18 @@ export default function OpportunitiesPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    return opps.filter((opp) => {
-      if (filters.country && opp.country !== filters.country) return false;
-      if (filters.region && opp.region !== filters.region) return false;
-      if (filters.stage && opp.stage !== filters.stage) return false;
-      if (filters.tag && !opp.tags.includes(filters.tag)) return false;
-      if (filters.peopleId) {
-        const hit = opp.owner?.id === filters.peopleId || opp.coOwner?.id === filters.peopleId;
-        if (!hit) return false;
-      }
-      if (filters.dateFrom && opp.closeDate && opp.closeDate < new Date(filters.dateFrom)) return false;
-      if (filters.dateTo && opp.closeDate && opp.closeDate > new Date(filters.dateTo + "T23:59:59")) return false;
-      return true;
-    });
-  }, [opps, filters]);
+    return opps
+      .filter((opp) => opportunityMatchesFilters(
+        opp,
+        filters,
+        (productsByOpp[opp.id] || []).map((p) => p.productName),
+      ))
+      .sort(byOpportunityTitle);
+  }, [opps, filters, productsByOpp]);
 
   const canMove = (opp: Opportunity, to: OpportunityStage) => {
-    const canEdit = canEditOpportunity(opp, profile, user?.uid);
-    return canChangeStage(opp.stage, to, profile, canEdit);
+    const isOwner = !!user && opp.owner?.id === user.uid;
+    return canChangeStage(opp.stage, to, profile, isOwner);
   };
 
   const onStageChange = async (oppId: string, stage: OpportunityStage) => {
@@ -120,7 +119,7 @@ export default function OpportunitiesPage() {
         </div>
       </div>
 
-      <FilterBar value={filters} onChange={setFilters} users={users} tags={tagNames} showStage />
+      <FilterBar value={filters} onChange={setFilters} users={users} tags={tagNames} products={productNames} showStage />
 
       {loading ? (
         <div className="flex justify-center py-16">

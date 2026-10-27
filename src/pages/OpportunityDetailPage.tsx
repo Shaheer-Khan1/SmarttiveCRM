@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import {
   getOpportunity, getActivities, updateOpportunity, deleteOpportunity,
-  createActivity, deleteActivity, uploadFile, getComments, addComment, deleteComment,
+  createActivity, updateActivity, deleteActivity, uploadFile, getComments, addComment, deleteComment,
   getUsers, type Opportunity, type Activity, type Comment, type UserProfile, type OpportunityStage,
 } from "@/lib/firestore";
 import {
@@ -21,9 +21,12 @@ import FollowUpBadge from "@/components/FollowUpBadge";
 import PocTracker from "@/components/PocTracker";
 import TagAutocomplete from "@/components/TagAutocomplete";
 import StageMoveDialog from "@/components/StageMoveDialog";
+import OpportunityTimeTracker from "@/components/OpportunityTimeTracker";
+import ProductMultiSelect from "@/components/ProductMultiSelect";
 import {
-  getFollowUpStatus, formatDate, formatDateTime, ACTIVITY_TYPES, CURRENCIES,
-  PIPELINE_STAGE_LABELS, COUNTRIES, REGIONS,
+  getFollowUpStatus, followUpReason, RED_FLAG_EXPLANATION, formatDate, formatDateTime, ACTIVITY_TYPES, CURRENCIES,
+  PIPELINE_STAGE_LABELS, REGIONS, countriesForRegion, countryFlag,
+  fromDateAndTime, toDateInputValue, toTimeInputValue,
 } from "@/lib/utils";
 import {
   canEditOpportunity, canContributeToOpportunity, canChangeOwner, canChangeCoOwner,
@@ -47,6 +50,7 @@ export default function OpportunityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [newComment, setNewComment] = useState("");
   const [stageMove, setStageMove] = useState<{
     to: OpportunityStage;
@@ -108,8 +112,9 @@ export default function OpportunityDetailPage() {
 
   const requestStageMove = (stage: OpportunityStage) => {
     if (!opp || !id) return;
-    if (!canChangeStage(opp.stage, stage, profile, canEdit)) {
-      alert("Stages move one step forward. Only an admin can move a stage back.");
+    const isOwner = opp.owner?.id === user?.uid;
+    if (!canChangeStage(opp.stage, stage, profile, isOwner)) {
+      alert("Only the owner can move this opportunity to the next stage. Only an admin can move a stage back.");
       return;
     }
     const kind = stageMoveKind(opp.stage, stage);
@@ -147,6 +152,7 @@ export default function OpportunityDetailPage() {
   if (!opp) return <div className="text-center py-20 text-gray-400">Opportunity not found</div>;
 
   const followUp = getFollowUpStatus(opp.lastActivityDate || null);
+  const isOwner = opp.owner?.id === user?.uid;
   const pocNeeded = products.filter((p) => p.requiresPoc);
   const pocDone = pocNeeded.filter((p) => p.pocStatus === "COMPLETED").length;
   const stagedComments: Comment[] = comments.map((c) => ({
@@ -165,9 +171,12 @@ export default function OpportunityDetailPage() {
               {followUp !== "NO_ACTIVITY" && <FollowUpBadge status={followUp} />}
             </div>
             <h1 className="page-title break-words">{opp.title}</h1>
+            {(followUp === "RED_FLAG" || followUp === "WARNING") && (
+              <p className="text-xs text-red-700 mt-1">{followUpReason(opp.lastActivityDate || null)} {RED_FLAG_EXPLANATION}</p>
+            )}
             <p className="text-sm text-gray-500 mt-1">
               <Link to={`/customers/${opp.customerId}`} className="text-blue-600 hover:underline">{opp.customerName}</Link>
-              {" · "}{opp.country || "—"}
+              {" · "}{countryFlag(opp.country)} {opp.country || "—"}
               {opp.closeDate ? ` · Close ${formatDate(opp.closeDate)}` : ""}
             </p>
           </div>
@@ -198,7 +207,7 @@ export default function OpportunityDetailPage() {
             const done = currentIdx >= 0 && idx < currentIdx;
             const isNext = currentIdx >= 0 && idx === currentIdx + 1;
             const isBack = opp.stage === "CLOSED_LOST" || (currentIdx >= 0 && idx < currentIdx);
-            const allowed = (isNext && canEdit) || (checkAdmin(profile) && isBack && !active);
+            const allowed = (isNext && isOwner) || (checkAdmin(profile) && isBack && !active);
             return (
               <div key={s} className="flex items-center">
                 <button
@@ -206,8 +215,8 @@ export default function OpportunityDetailPage() {
                   disabled={!allowed}
                   onClick={() => requestStageMove(s)}
                   title={allowed
-                    ? (isNext ? "Move one stage forward" : "Admin: move back")
-                    : "Only the next stage is available"}
+                    ? (isNext ? "Owner: move one stage forward" : "Admin: move back")
+                    : isNext ? "Only the owner can move this to the next stage" : "Only the next stage is available"}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     active ? "bg-blue-600 text-white border-blue-600"
                       : done ? "bg-blue-50 text-blue-700 border-blue-200"
@@ -222,7 +231,7 @@ export default function OpportunityDetailPage() {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canEdit && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
+          {isOwner && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
             <button
               type="button"
               onClick={() => requestStageMove("CLOSED_LOST")}
@@ -234,6 +243,11 @@ export default function OpportunityDetailPage() {
           {opp.stage === "CLOSED_LOST" && (
             <span className="text-xs font-medium text-red-700">Closed lost</span>
           )}
+          {!isOwner && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
+            <span className="text-xs text-slate-500">
+              Only the owner{opp.owner?.name ? `, ${opp.owner.name},` : ""} can move this to the next stage.
+            </span>
+          )}
           {opp.stageEnteredAt && (
             <span className="text-xs text-slate-500">
               In this stage since {formatDateTime(opp.stageEnteredAt)}
@@ -241,6 +255,8 @@ export default function OpportunityDetailPage() {
           )}
         </div>
       </div>
+
+      <OpportunityTimeTracker opp={opp} />
 
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2 space-y-4 sm:space-y-6 min-w-0">
@@ -251,6 +267,7 @@ export default function OpportunityDetailPage() {
               <Info label="Co-Owner" value={opp.coOwner?.name || "None"} />
               <Info label="Expected Value" value={opp.value != null ? `${opp.value.toLocaleString()} ${opp.currency || ""}` : "—"} />
               <Info label="Region" value={opp.region || "—"} />
+              <Info label="Partner" value={opp.partner || "—"} />
             </div>
             {opp.notes && <p className="text-sm text-gray-600 whitespace-pre-wrap">{opp.notes}</p>}
             <div>
@@ -332,7 +349,9 @@ export default function OpportunityDetailPage() {
               activities={activities}
               comments={stagedComments}
               canDeleteActivity={(a) => canDeleteRecord(profile, a.createdById, user?.uid)}
+              canEditActivity={(a) => canDeleteRecord(profile, a.createdById, user?.uid) || a.createdById === user?.uid}
               onDelete={handleDeleteActivity}
+              onEdit={(a) => setEditingActivity(a)}
             />
           </section>
 
@@ -391,7 +410,7 @@ export default function OpportunityDetailPage() {
             <div className="space-y-2">
               {events.length === 0 ? (
                 <p className="text-xs text-gray-400">No audit events yet</p>
-              ) : events.map((e) => (
+              ) : events.filter((e) => !e.message.startsWith("Activity logged:") && !e.message.startsWith("File uploaded on activity:")).map((e) => (
                 <div key={e.id} className="text-xs border-b border-gray-50 pb-2">
                   <p className="text-gray-800">{e.message}</p>
                   <p className="text-gray-400 mt-0.5">{e.actorName} · {formatDateTime(opportunityEventAt(e))}</p>
@@ -402,11 +421,12 @@ export default function OpportunityDetailPage() {
         </div>
       </div>
 
-      {showActivity && (
-        <AddActivityModal
+      {(showActivity || editingActivity) && (
+        <ActivityFormModal
           opportunityId={id!}
-          onClose={() => setShowActivity(false)}
-          onSaved={() => { setShowActivity(false); load(); }}
+          activity={editingActivity}
+          onClose={() => { setShowActivity(false); setEditingActivity(null); }}
+          onSaved={() => { setShowActivity(false); setEditingActivity(null); load(); }}
         />
       )}
 
@@ -447,32 +467,54 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AddActivityModal({ opportunityId, onClose, onSaved }: {
-  opportunityId: string; onClose: () => void; onSaved: () => void;
+function ActivityFormModal({ opportunityId, activity, onClose, onSaved }: {
+  opportunityId: string;
+  activity: Activity | null;
+  onClose: () => void;
+  onSaved: () => void;
 }) {
   const { user, profile } = useAuth();
-  const [form, setForm] = useState({ type: "MEETING", date: new Date().toISOString().slice(0, 10), summary: "", notes: "" });
+  const now = new Date();
+  const [form, setForm] = useState({
+    type: activity?.type || "MEETING",
+    date: toDateInputValue(activity?.date || now),
+    time: toTimeInputValue(activity?.date || now),
+    summary: activity?.summary || "",
+    notes: activity?.notes || "",
+  });
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.date || !form.time) return;
     setSaving(true);
     try {
-      const actId = await createActivity({
-        opportunityId,
-        type: form.type,
-        date: new Date(form.date),
-        summary: form.summary,
-        notes: form.notes,
-      });
-      if (file) await uploadFile(file, opportunityId, actId);
-      await logOpportunityEvent(opportunityId, {
-        type: file ? "FILE_UPLOADED" : "UPDATED",
-        message: file ? `File uploaded on activity: ${form.summary}` : `Activity logged: ${form.summary}`,
-        actorId: user?.uid || "",
-        actorName: profile?.name || "User",
-      });
+      const when = fromDateAndTime(form.date, form.time);
+      if (activity) {
+        await updateActivity(activity.id, opportunityId, {
+          type: form.type,
+          date: when,
+          summary: form.summary,
+          notes: form.notes,
+        });
+      } else {
+        const actId = await createActivity({
+          opportunityId,
+          type: form.type,
+          date: when,
+          summary: form.summary,
+          notes: form.notes,
+        });
+        if (file) await uploadFile(file, opportunityId, actId);
+        await logOpportunityEvent(opportunityId, {
+          type: file ? "FILE_UPLOADED" : "UPDATED",
+          message: file ? `File uploaded on activity: ${form.summary}` : `Activity logged: ${form.summary}`,
+          actorId: user?.uid || "",
+          actorName: profile?.name || "User",
+          meta: { activityId: actId },
+        });
+      }
       onSaved();
     } finally {
       setSaving(false);
@@ -482,18 +524,28 @@ function AddActivityModal({ opportunityId, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <form onSubmit={submit} className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-        <h2 className="text-lg font-semibold">Add Activity</h2>
+        <h2 className="text-lg font-semibold">{activity ? "Edit Activity" : "Add Activity"}</h2>
         <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
           {ACTIVITY_TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
-        <input type="date" required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            <span className="text-xs font-medium text-slate-500">Date</span>
+            <input type="date" required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-xs font-medium text-slate-500">Time</span>
+            <input type="time" required value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          </label>
+        </div>
         <input required placeholder="Summary" value={form.summary} onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
         <textarea rows={2} placeholder="Notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-        <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="text-sm" />
+        {!activity && <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="text-sm" />}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-3 py-2 text-sm">Cancel</button>
           <button type="submit" disabled={saving} className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg disabled:opacity-50">
@@ -524,8 +576,9 @@ function EditOpportunityModal({
     country: opp.country || "",
     region: opp.region || "",
     value: opp.value?.toString() || "",
-    currency: opp.currency || "SAR",
-    closeDate: opp.closeDate ? new Date(opp.closeDate).toISOString().slice(0, 10) : "",
+    currency: opp.currency || "USD",
+    closeDate: opp.closeDate ? toDateInputValue(new Date(opp.closeDate)) : "",
+    partner: opp.partner || "",
     notes: opp.notes || "",
     tags: [...opp.tags],
     ownerId: opp.owner?.id || "",
@@ -541,14 +594,6 @@ function EditOpportunityModal({
     })),
   );
   const [saving, setSaving] = useState(false);
-
-  const toggleProduct = (p: CatalogProduct) => {
-    setSelected((list) => {
-      const exists = list.find((x) => x.productId === p.id);
-      if (exists) return list.filter((x) => x.productId !== p.id);
-      return [...list, { productId: p.id, productName: p.name, color: p.color, requiresPoc: false, pocStatus: "NOT_STARTED" as const }];
-    });
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -572,7 +617,8 @@ function EditOpportunityModal({
         region: form.region || null,
         value: form.value ? parseFloat(form.value) : null,
         currency: form.currency,
-        closeDate: form.closeDate ? new Date(form.closeDate) : null,
+        closeDate: form.closeDate ? fromDateAndTime(form.closeDate, "12:00") : null,
+        partner: form.partner.trim(),
         notes: form.notes,
         tags: form.tags,
         owner: canOwner ? owner : opp.owner,
@@ -628,16 +674,30 @@ function EditOpportunityModal({
         <div className="p-6 space-y-3">
           <input required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="Name" />
           <div className="grid grid-cols-2 gap-3">
-            <select value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={inputCls + " bg-white"}>
-              {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <select value={form.region} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))} className={inputCls + " bg-white"}>
-              <option value="">Region</option>
+            <select
+              value={form.region}
+              onChange={(e) => {
+                const region = e.target.value;
+                const options = countriesForRegion(region);
+                setForm((f) => ({
+                  ...f,
+                  region,
+                  country: options.some((c) => c.name === f.country) ? f.country : (options[0]?.name || ""),
+                }));
+              }}
+              className={inputCls + " bg-white"}
+            >
               {REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>
+            <select value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={inputCls + " bg-white"}>
+              {countriesForRegion(form.region, form.country).map((c) => (
+                <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
+              ))}
+            </select>
           </div>
+          <input value={form.partner} onChange={(e) => setForm((f) => ({ ...f, partner: e.target.value }))} className={inputCls} placeholder="Partner" />
           <p className="text-xs text-slate-500">
-            Stage is {PIPELINE_STAGE_LABELS[opp.stage]}. Move it one step at a time from the stage bar. Date and time are required, and only an admin can move back.
+            Stage is {PIPELINE_STAGE_LABELS[opp.stage]}. Only the owner can move it one step forward. Only an admin can move it back.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <select disabled={!canOwner} value={form.ownerId} onChange={(e) => setForm((f) => ({ ...f, ownerId: e.target.value }))} className={inputCls + " bg-white disabled:opacity-60"}>
@@ -650,16 +710,14 @@ function EditOpportunityModal({
               ))}
             </select>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {catalog.map((p) => {
-              const on = selected.some((x) => x.productId === p.id);
-              return (
-                <button key={p.id} type="button" onClick={() => toggleProduct(p)}
-                  className={`px-2 py-1 rounded-full text-xs font-medium border ${on ? "text-white border-transparent" : "border-gray-200"}`}
-                  style={on ? { background: p.color } : undefined}>{p.name}</button>
-              );
-            })}
-          </div>
+          <ProductMultiSelect
+            catalog={catalog}
+            value={selected}
+            onChange={(next) => setSelected(next.map((p) => ({
+              ...p,
+              pocStatus: selected.find((x) => x.productId === p.productId)?.pocStatus || "NOT_STARTED",
+            })))}
+          />
           {selected.map((p) => (
             <label key={p.productId} className="flex items-center gap-2 text-xs text-gray-600">
               <input type="checkbox" checked={p.requiresPoc}

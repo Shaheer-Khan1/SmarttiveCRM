@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Paperclip, Trash2, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { Paperclip, Trash2, ChevronDown, ChevronUp, MessageSquare, Pencil } from "lucide-react";
 import { getActivityTypeColor, getActivityTypeIcon, formatDateTime, PIPELINE_STAGE_LABELS } from "@/lib/utils";
 import type { Activity, Comment } from "@/lib/firestore";
 import StatusBadge from "@/components/StatusBadge";
@@ -8,10 +8,14 @@ interface Props {
   activities: Activity[];
   comments?: Comment[];
   canDeleteActivity?: (activity: Activity) => boolean;
+  canEditActivity?: (activity: Activity) => boolean;
   onDelete?: (id: string) => void;
+  onEdit?: (activity: Activity) => void;
 }
 
-export default function ActivityTimeline({ activities, comments = [], canDeleteActivity, onDelete }: Props) {
+export default function ActivityTimeline({
+  activities, comments = [], canDeleteActivity, canEditActivity, onDelete, onEdit,
+}: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const rows = [
     ...activities.map((activity) => ({
@@ -80,6 +84,7 @@ export default function ActivityTimeline({ activities, comments = [], canDeleteA
           const isExpanded = expanded.has(activity.id);
           const hasExtra = activity.notes || (activity.attachments && activity.attachments.length > 0);
           const showDelete = !!onDelete && !!canDeleteActivity?.(activity);
+          const showEdit = !!onEdit && !!canEditActivity?.(activity);
           return (
             <div key={row.key} className="flex gap-4">
               <div className="flex-shrink-0 w-11 flex items-start justify-center pt-4">
@@ -103,6 +108,13 @@ export default function ActivityTimeline({ activities, comments = [], canDeleteA
                       <button onClick={() => toggle(activity.id)}
                         className="p-1 hover:bg-gray-100 rounded text-gray-400">
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+                    {showEdit && (
+                      <button onClick={() => onEdit?.(activity)}
+                        className="p-1 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-400 transition-colors"
+                        aria-label="Edit activity">
+                        <Pencil className="w-4 h-4" />
                       </button>
                     )}
                     {showDelete && (

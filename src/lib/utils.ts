@@ -79,12 +79,113 @@ export const PIPELINE_STAGE_LABELS: Record<string, string> = {
   CLOSED_LOST: "Closed Lost",
 };
 
-export const COUNTRIES = [
-  "Saudi Arabia", "UAE", "Qatar", "Bahrain", "Kuwait", "Oman",
-  "Egypt", "Jordan", "USA", "UK", "Other",
+export interface CountryOption {
+  name: string;
+  region: string;
+  flag: string;
+}
+
+/** Sales countries grouped by region. Names stay stable so existing records still match. */
+export const COUNTRY_OPTIONS: CountryOption[] = [
+  { name: "Saudi Arabia", region: "GCC", flag: "🇸🇦" },
+  { name: "UAE", region: "GCC", flag: "🇦🇪" },
+  { name: "Qatar", region: "GCC", flag: "🇶🇦" },
+  { name: "Bahrain", region: "GCC", flag: "🇧🇭" },
+  { name: "Kuwait", region: "GCC", flag: "🇰🇼" },
+  { name: "Oman", region: "GCC", flag: "🇴🇲" },
+
+  { name: "Egypt", region: "MENA", flag: "🇪🇬" },
+  { name: "Jordan", region: "MENA", flag: "🇯🇴" },
+  { name: "Lebanon", region: "MENA", flag: "🇱🇧" },
+  { name: "Iraq", region: "MENA", flag: "🇮🇶" },
+  { name: "Morocco", region: "MENA", flag: "🇲🇦" },
+  { name: "Tunisia", region: "MENA", flag: "🇹🇳" },
+  { name: "Algeria", region: "MENA", flag: "🇩🇿" },
+  { name: "Libya", region: "MENA", flag: "🇱🇾" },
+  { name: "Yemen", region: "MENA", flag: "🇾🇪" },
+
+  { name: "UK", region: "Europe", flag: "🇬🇧" },
+  { name: "Germany", region: "Europe", flag: "🇩🇪" },
+  { name: "France", region: "Europe", flag: "🇫🇷" },
+  { name: "Italy", region: "Europe", flag: "🇮🇹" },
+  { name: "Spain", region: "Europe", flag: "🇪🇸" },
+  { name: "Netherlands", region: "Europe", flag: "🇳🇱" },
+  { name: "Switzerland", region: "Europe", flag: "🇨🇭" },
+  { name: "Turkey", region: "Europe", flag: "🇹🇷" },
+
+  { name: "USA", region: "Americas", flag: "🇺🇸" },
+  { name: "Canada", region: "Americas", flag: "🇨🇦" },
+  { name: "Mexico", region: "Americas", flag: "🇲🇽" },
+  { name: "Brazil", region: "Americas", flag: "🇧🇷" },
+
+  { name: "India", region: "APAC", flag: "🇮🇳" },
+  { name: "Pakistan", region: "APAC", flag: "🇵🇰" },
+  { name: "China", region: "APAC", flag: "🇨🇳" },
+  { name: "Singapore", region: "APAC", flag: "🇸🇬" },
+  { name: "Malaysia", region: "APAC", flag: "🇲🇾" },
+  { name: "Indonesia", region: "APAC", flag: "🇮🇩" },
+  { name: "Australia", region: "APAC", flag: "🇦🇺" },
+  { name: "Japan", region: "APAC", flag: "🇯🇵" },
+  { name: "South Korea", region: "APAC", flag: "🇰🇷" },
+
+  { name: "Other", region: "Other", flag: "🏳️" },
 ];
 
+export const COUNTRIES = COUNTRY_OPTIONS.map((c) => c.name);
+
 export const REGIONS = ["GCC", "MENA", "Europe", "Americas", "APAC", "Other"];
+
+export function countriesForRegion(region: string, current?: string): CountryOption[] {
+  const list = region ? COUNTRY_OPTIONS.filter((c) => c.region === region) : COUNTRY_OPTIONS;
+  if (current && !list.some((c) => c.name === current)) {
+    return [{ name: current, region: region || "Other", flag: countryFlag(current) || "🏳️" }, ...list];
+  }
+  return list;
+}
+
+export function countryFlag(name: string | null | undefined): string {
+  if (!name) return "";
+  return COUNTRY_OPTIONS.find((c) => c.name === name)?.flag || "";
+}
+
+export function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function toTimeInputValue(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Local date + time. Avoids `new Date("YYYY-MM-DD")`, which is UTC midnight (5:00 AM in UTC+5). */
+export function fromDateAndTime(date: string, time = "00:00"): Date {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
+}
+
+export function defaultCloseDateInput(): string {
+  return toDateInputValue(addMonths(new Date(), 3));
+}
+
+export function byOpportunityTitle<T extends { title: string }>(a: T, b: T): number {
+  return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+}
+
+export const RED_FLAG_EXPLANATION =
+  "A red flag means no activity has been logged for 7 or more days. A warning means 5 or 6 days without a logged activity.";
+
+export function followUpReason(lastActivityDate: Date | null): string {
+  if (!lastActivityDate) return "No activity has been logged on this opportunity yet.";
+  const days = differenceInDays(new Date(), lastActivityDate);
+  const when = format(new Date(lastActivityDate), "MMM d, yyyy 'at' h:mm a");
+  if (days >= 7) return `No activity for ${days} days. Last activity was ${when}.`;
+  if (days >= 5) return `Last activity was ${days} days ago (${when}).`;
+  if (days <= 0) return `Last activity was ${when}.`;
+  return `Last activity was ${days} day${days === 1 ? "" : "s"} ago (${when}).`;
+}
 
 export const CATALOG_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",

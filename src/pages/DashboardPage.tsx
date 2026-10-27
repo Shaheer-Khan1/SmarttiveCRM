@@ -6,14 +6,17 @@ import {
 } from "lucide-react";
 import OpportunityCard from "@/components/OpportunityCard";
 import GlobalProgressCalendar from "@/components/GlobalProgressCalendar";
-import FilterBar, { emptyFilters, type GlobalFilters } from "@/components/FilterBar";
+import FilterBar, { emptyFilters, opportunityMatchesFilters, type GlobalFilters } from "@/components/FilterBar";
 import {
   getDashboardData, getUsers, searchAll, getProducts,
   type Opportunity, type Activity as ActivityType, type UserProfile, type Customer, type Product,
 } from "@/lib/firestore";
-import { createMeetingNote, getMeetingNotes } from "@/lib/crm";
+import { createMeetingNote, getCatalogProducts, getMeetingNotes } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
-import { getFollowUpStatus, formatDate, getActivityTypeIcon, getProductStatusLabel } from "@/lib/utils";
+import {
+  getFollowUpStatus, RED_FLAG_EXPLANATION, formatDate,
+  getActivityTypeIcon, getProductStatusLabel, byOpportunityTitle, countryFlag,
+} from "@/lib/utils";
 import { canCreateCrmRecords } from "@/lib/permissions";
 import StatusBadge from "@/components/StatusBadge";
 
@@ -32,6 +35,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<GlobalFilters>(emptyFilters());
+  const [productNames, setProductNames] = useState<string[]>([]);
 
   const [quickNote, setQuickNote] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
@@ -50,6 +54,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     getUsers().then(setUsers).catch(() => {});
+    getCatalogProducts({ activeOnly: true })
+      .then((list) => setProductNames(list.map((p) => p.name).sort((a, b) => a.localeCompare(b))))
+      .catch(() => {});
     getDashboardData().then(({ opportunities, activities: allActivities, totalCustomers }) => {
       const open = (o: Opportunity) => o.stage !== "CLOSED_WON" && o.stage !== "CLOSED_LOST";
       const active = opportunities.filter(open);
@@ -109,14 +116,10 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const filteredOpps = useMemo(() => opps.filter((opp) => {
-    if (filters.country && opp.country !== filters.country) return false;
-    if (filters.region && opp.region !== filters.region) return false;
-    if (filters.stage && opp.stage !== filters.stage) return false;
-    if (filters.tag && !opp.tags.includes(filters.tag)) return false;
-    if (filters.peopleId && opp.owner?.id !== filters.peopleId && opp.coOwner?.id !== filters.peopleId) return false;
-    return true;
-  }), [opps, filters]);
+  const filteredOpps = useMemo(
+    () => opps.filter((opp) => opportunityMatchesFilters(opp, filters)).sort(byOpportunityTitle),
+    [opps, filters],
+  );
 
   const saveQuickDraft = async () => {
     if (!quickNote.trim() || !user || !profile) return;
@@ -203,7 +206,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <FilterBar value={filters} onChange={setFilters} users={users} tags={allTags} showStage />
+      <FilterBar value={filters} onChange={setFilters} users={users} tags={allTags} products={productNames} showStage />
 
       {(stats!.redFlags > 0 || stats!.warnings > 0) && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
@@ -215,6 +218,7 @@ export default function DashboardPage() {
               {stats!.redFlags > 0 && stats!.warnings > 0 && " · "}
               {stats!.warnings > 0 && `${stats!.warnings} warning${stats!.warnings > 1 ? "s" : ""} need follow-up`}
             </p>
+            <p className="text-xs text-red-700/80 mt-1">{RED_FLAG_EXPLANATION}</p>
           </div>
         </div>
       )}
@@ -245,6 +249,7 @@ export default function DashboardPage() {
               View all <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
+          <p className="text-xs text-slate-500 mb-3">{RED_FLAG_EXPLANATION}</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {redFlagOpps.slice(0, 6).map((opp) => <OpportunityCard key={opp.id} opp={opp} />)}
           </div>
@@ -327,7 +332,10 @@ export default function DashboardPage() {
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium text-slate-900">{opp.title}</p>
-                      <p className="text-xs text-slate-500">{opp.customerName}</p>
+                      <p className="text-xs text-slate-500">
+                        {opp.customerName}
+                        {opp.country ? ` · ${countryFlag(opp.country)} ${opp.country}` : ""}
+                      </p>
                     </div>
                     <StatusBadge status={opp.stage} />
                   </button>

@@ -66,6 +66,8 @@ export interface Opportunity {
   currency?: string;
   nextStep?: string;
   notes?: string;
+  /** External or channel partner working this opportunity. */
+  partner?: string;
   tags: string[];
   owner: AssignedPerson;
   coOwner: AssignedPerson | null;
@@ -322,6 +324,7 @@ function docToOpportunity(snap: { id: string; data: () => Record<string, unknown
     currency: (d.currency as string) || "SAR",
     nextStep: d.nextStep as string | undefined,
     notes: d.notes as string | undefined,
+    partner: (d.partner as string) || "",
     tags: Array.isArray(d.tags) ? d.tags as string[] : [],
     owner,
     coOwner,
@@ -453,16 +456,67 @@ export async function createActivity(data: {
   return ref.id;
 }
 
-export async function deleteActivity(id: string, opportunityId: string) {
-  await deleteDoc(doc(db, "activities", id));
+async function syncActivityEvents(
+  opportunityId: string,
+  activityId: string,
+  previousSummary: string,
+  nextSummary: string | null,
+) {
+  const snap = await getDocs(collection(db, "opportunities", opportunityId, "events"));
+  const batch = writeBatch(db);
+  let changed = 0;
+  snap.docs.forEach((d) => {
+    const message = String(d.data().message || "");
+    const meta = d.data().meta as { activityId?: string } | undefined;
+    const logged = previousSummary ? `Activity logged: ${previousSummary}` : "";
+    const uploaded = previousSummary ? `File uploaded on activity: ${previousSummary}` : "";
+    const matches = meta?.activityId === activityId || (!!previousSummary && (message === logged || message === uploaded));
+    if (!matches) return;
+    changed += 1;
+    if (nextSummary == null) batch.delete(d.ref);
+    else if (message === uploaded || message.startsWith("File uploaded")) {
+      batch.update(d.ref, { message: `File uploaded on activity: ${nextSummary}` });
+    } else {
+      batch.update(d.ref, { message: `Activity logged: ${nextSummary}`, meta: { ...(meta || {}), activityId } });
+    }
+  });
+  if (changed) await batch.commit();
+}
 
-  // Recalculate lastActivityDate (client sort — no composite index required)
+async function refreshLastActivity(opportunityId: string) {
   const remaining = await getActivities(opportunityId);
   const lastDate = remaining[0] ? Timestamp.fromDate(remaining[0].date) : null;
   await updateDoc(doc(db, "opportunities", opportunityId), {
     lastActivityDate: lastDate,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function updateActivity(
+  id: string,
+  opportunityId: string,
+  data: { type: string; date: Date; summary: string; notes?: string },
+) {
+  const prev = await getDoc(doc(db, "activities", id));
+  const previousSummary = prev.exists() ? String(prev.data().summary || "") : "";
+  await updateDoc(doc(db, "activities", id), {
+    type: data.type,
+    date: Timestamp.fromDate(data.date),
+    summary: data.summary,
+    notes: data.notes || "",
+  });
+  if (previousSummary !== data.summary) {
+    await syncActivityEvents(opportunityId, id, previousSummary, data.summary);
+  }
+  await refreshLastActivity(opportunityId);
+}
+
+export async function deleteActivity(id: string, opportunityId: string) {
+  const prev = await getDoc(doc(db, "activities", id));
+  const previousSummary = prev.exists() ? String(prev.data().summary || "") : "";
+  await deleteDoc(doc(db, "activities", id));
+  await syncActivityEvents(opportunityId, id, previousSummary, null);
+  await refreshLastActivity(opportunityId);
 }
 
 // ─── Comments ─────────────────────────────────────────────────────────────────

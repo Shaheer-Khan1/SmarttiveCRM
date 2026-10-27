@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, X } from "lucide-react";
 import { createMeetingNote, type NotePermission } from "@/lib/crm";
 import { getOpportunities, getUsers, type Opportunity, type UserProfile } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { COUNTRIES } from "@/lib/utils";
+import { COUNTRY_OPTIONS } from "@/lib/utils";
 import { canCreateCrmRecords } from "@/lib/permissions";
 
 export default function NewMeetingNotePage() {
@@ -119,7 +119,7 @@ export default function NewMeetingNotePage() {
           <div>
             <label className="text-xs font-medium text-gray-700 mb-1.5 block">Country</label>
             <select value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={inputCls + " bg-white"}>
-              {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
+              {COUNTRY_OPTIONS.map((c) => <option key={c.name} value={c.name}>{c.flag} {c.name}</option>)}
             </select>
           </div>
         </div>
