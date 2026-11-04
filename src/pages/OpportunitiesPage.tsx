@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, LayoutGrid, Columns3 } from "lucide-react";
 import { getOpportunities, getUsers, type Opportunity, type UserProfile, type OpportunityStage } from "@/lib/firestore";
 import {
-  getOpportunityProducts, getTags, getCatalogProducts, moveOpportunityStage,
-  type OpportunityProduct,
+  getOpportunityProducts, getTags, getCatalogProducts, ensureBuiltinCatalogProducts, withBuiltinCatalog,
+  moveOpportunityStage, type OpportunityProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
 import FilterBar, { emptyFilters, opportunityMatchesFilters, type GlobalFilters } from "@/components/FilterBar";
@@ -14,10 +14,12 @@ import {
   canChangeStage, canCreateCrmRecords, stageMoveKind,
   type StageMoveKind,
 } from "@/lib/permissions";
-import { byOpportunityTitle } from "@/lib/utils";
+import { byOpportunityTitle, getFollowUpStatus, RED_FLAG_EXPLANATION } from "@/lib/utils";
 
 export default function OpportunitiesPage() {
   const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const followUpFilter = searchParams.get("followUp");
   const canCreate = canCreateCrmRecords(profile);
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -35,13 +37,14 @@ export default function OpportunitiesPage() {
 
   const load = async () => {
     setLoading(true);
+    await ensureBuiltinCatalogProducts();
     const [o, u, t, catalog] = await Promise.all([
       getOpportunities(), getUsers(), getTags(), getCatalogProducts({ activeOnly: true }),
     ]);
     setOpps(o);
     setUsers(u);
     setTagNames(t.map((x) => x.name));
-    setProductNames(catalog.map((p) => p.name).sort((a, b) => a.localeCompare(b)));
+    setProductNames(withBuiltinCatalog(catalog).map((p) => p.name));
     const map: Record<string, OpportunityProduct[]> = {};
     await Promise.all(o.map(async (opp) => {
       map[opp.id] = await getOpportunityProducts(opp.id);
@@ -54,13 +57,16 @@ export default function OpportunitiesPage() {
 
   const filtered = useMemo(() => {
     return opps
-      .filter((opp) => opportunityMatchesFilters(
-        opp,
-        filters,
-        (productsByOpp[opp.id] || []).map((p) => p.productName),
-      ))
+      .filter((opp) => {
+        if (followUpFilter && getFollowUpStatus(opp.lastActivityDate || null) !== followUpFilter) return false;
+        return opportunityMatchesFilters(
+          opp,
+          filters,
+          (productsByOpp[opp.id] || []).map((p) => p.productName),
+        );
+      })
       .sort(byOpportunityTitle);
-  }, [opps, filters, productsByOpp]);
+  }, [opps, filters, productsByOpp, followUpFilter]);
 
   const canMove = (opp: Opportunity, to: OpportunityStage) => {
     const isOwner = !!user && opp.owner?.id === user.uid;
@@ -120,6 +126,13 @@ export default function OpportunitiesPage() {
       </div>
 
       <FilterBar value={filters} onChange={setFilters} users={users} tags={tagNames} products={productNames} showStage />
+
+      {(followUpFilter === "RED_FLAG" || followUpFilter === "WARNING") && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          {followUpFilter === "RED_FLAG" ? "Showing red-flagged opportunities. " : "Showing follow-up warnings. "}
+          {RED_FLAG_EXPLANATION}
+        </p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">

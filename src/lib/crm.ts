@@ -54,6 +54,55 @@ export interface CatalogProduct {
   updatedAt: Date;
 }
 
+/** Always offered in the opportunity product dropdown, even before an admin adds it. */
+export const BUILTIN_CATALOG: { name: string; color: string }[] = [
+  { name: "VR", color: "#8B5CF6" },
+];
+
+export function withBuiltinCatalog(list: CatalogProduct[]): CatalogProduct[] {
+  const extras: CatalogProduct[] = BUILTIN_CATALOG
+    .filter((b) => !list.some((p) => p.name.trim().toLowerCase() === b.name.toLowerCase()))
+    .map((b) => ({
+      id: `builtin:${b.name}`,
+      name: b.name,
+      active: true,
+      color: b.color,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+  return [...list, ...extras].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+/** Creates missing built-in catalog rows (VR) so later loads use a real id. */
+export async function ensureBuiltinCatalogProducts(): Promise<void> {
+  let list: CatalogProduct[] = [];
+  try {
+    list = await getCatalogProducts();
+  } catch {
+    return;
+  }
+  for (const item of BUILTIN_CATALOG) {
+    if (list.some((p) => p.name.trim().toLowerCase() === item.name.toLowerCase())) continue;
+    try {
+      await createCatalogProduct({ name: item.name, color: item.color, active: true });
+    } catch {
+      // The dropdown still shows the built-in name; save will create the row if this caller cannot.
+    }
+  }
+}
+
+export async function resolveCatalogProductId(choice: {
+  productId: string;
+  productName: string;
+  color: string;
+}): Promise<string> {
+  if (!choice.productId.startsWith("builtin:")) return choice.productId;
+  const existing = await getCatalogProducts();
+  const found = existing.find((p) => p.name.trim().toLowerCase() === choice.productName.trim().toLowerCase());
+  if (found) return found.id;
+  return createCatalogProduct({ name: choice.productName, color: choice.color, active: true });
+}
+
 export async function getCatalogProducts(opts?: { activeOnly?: boolean }): Promise<CatalogProduct[]> {
   const snap = await getDocs(query(collection(db, "product_catalog"), orderBy("name")));
   let list = snap.docs.map((d) => {

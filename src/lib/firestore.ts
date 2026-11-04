@@ -1354,12 +1354,13 @@ export async function seedDemoData(adminUid: string, adminName: string) {
   const managerPerson = manager ? { id: manager.id, name: manager.name } : null;
 
   // Product catalog + tags for CRM seed
-  const catColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6"];
+  const catColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"];
   const catalogItems = [
     { name: "PSIM Platform", color: catColors[0] },
     { name: "Smart Parking", color: catColors[1] },
     { name: "Video Analytics", color: catColors[2] },
     { name: "NOC Platform", color: catColors[3] },
+    { name: "VR", color: catColors[4] },
   ];
   const catalogIds: { id: string; name: string; color: string }[] = [];
   for (const item of catalogItems) {

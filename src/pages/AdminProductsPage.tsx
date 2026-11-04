@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getCatalogProducts, createCatalogProduct, updateCatalogProduct,
+  getCatalogProducts, ensureBuiltinCatalogProducts, createCatalogProduct, updateCatalogProduct,
   type CatalogProduct,
 } from "@/lib/crm";
 import { CATALOG_COLORS } from "@/lib/utils";
@@ -17,7 +17,10 @@ export default function AdminProductsPage() {
   const [edit, setEdit] = useState<CatalogProduct | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const load = () => getCatalogProducts().then(setProducts).finally(() => setLoading(false));
+  const load = () => ensureBuiltinCatalogProducts()
+    .then(() => getCatalogProducts())
+    .then(setProducts)
+    .finally(() => setLoading(false));
   useEffect(() => { if (canManage) load(); }, [canManage]);
 
   if (!canManage) return <Navigate to="/dashboard" replace />;

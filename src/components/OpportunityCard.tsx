@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Calendar, Users } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import FollowUpBadge from "./FollowUpBadge";
-import { getFollowUpStatus, followUpReason, formatTimeAgo, formatDate, countryFlag } from "@/lib/utils";
+import { getFollowUpStatus, followUpReason, RED_FLAG_EXPLANATION, formatTimeAgo, formatDate, countryFlag } from "@/lib/utils";
 import type { Opportunity } from "@/lib/firestore";
 import ProductChips from "@/components/ProductChips";
 import type { OpportunityProduct } from "@/lib/crm";
@@ -37,7 +37,9 @@ export default function OpportunityCard({
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         {followUpStatus !== "NO_ACTIVITY" && <FollowUpBadge status={followUpStatus} />}
         {(followUpStatus === "RED_FLAG" || followUpStatus === "WARNING") && (
-          <p className="text-[11px] text-slate-500 basis-full">{followUpReason(opp.lastActivityDate || null)}</p>
+          <p className="text-[11px] text-slate-500 basis-full">
+            {followUpReason(opp.lastActivityDate || null)} {RED_FLAG_EXPLANATION}
+          </p>
         )}
         {opp.value != null && (
           <span className="text-xs text-gray-500">{opp.value.toLocaleString()} {opp.currency}</span>

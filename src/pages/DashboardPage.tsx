@@ -11,7 +11,7 @@ import {
   getDashboardData, getUsers, searchAll, getProducts,
   type Opportunity, type Activity as ActivityType, type UserProfile, type Customer, type Product,
 } from "@/lib/firestore";
-import { createMeetingNote, getCatalogProducts, getMeetingNotes } from "@/lib/crm";
+import { createMeetingNote, getCatalogProducts, ensureBuiltinCatalogProducts, withBuiltinCatalog, getMeetingNotes } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
 import {
   getFollowUpStatus, RED_FLAG_EXPLANATION, formatDate,
@@ -54,8 +54,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     getUsers().then(setUsers).catch(() => {});
-    getCatalogProducts({ activeOnly: true })
-      .then((list) => setProductNames(list.map((p) => p.name).sort((a, b) => a.localeCompare(b))))
+    ensureBuiltinCatalogProducts()
+      .then(() => getCatalogProducts({ activeOnly: true }))
+      .then((list) => setProductNames(withBuiltinCatalog(list).map((p) => p.name)))
       .catch(() => {});
     getDashboardData().then(({ opportunities, activities: allActivities, totalCustomers }) => {
       const open = (o: Opportunity) => o.stage !== "CLOSED_WON" && o.stage !== "CLOSED_LOST";
@@ -335,6 +336,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-slate-500">
                         {opp.customerName}
                         {opp.country ? ` · ${countryFlag(opp.country)} ${opp.country}` : ""}
+                        {opp.solution ? ` · ${opp.solution}` : ""}
                       </p>
                     </div>
                     <StatusBadge status={opp.stage} />

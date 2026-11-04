@@ -10,6 +10,7 @@ import {
 } from "@/lib/firestore";
 import {
   getOpportunityProducts, getOpportunityEvents, getMeetingNotes, getCatalogProducts,
+  ensureBuiltinCatalogProducts, withBuiltinCatalog, resolveCatalogProductId,
   setOpportunityProducts, syncOpportunityTags, logOpportunityEvent, moveOpportunityStage,
   opportunityEventAt, stageAtTime,
   type OpportunityProduct, type OpportunityEvent, type MeetingNote, type CatalogProduct,
@@ -62,6 +63,7 @@ export default function OpportunityDetailPage() {
     try {
       const o = await getOpportunity(id);
       setOpp(o);
+      await ensureBuiltinCatalogProducts().catch(() => {});
 
       // Load secondary data independently so a missing index / empty collection
       // cannot block the opportunity itself from rendering.
@@ -88,7 +90,7 @@ export default function OpportunityDetailPage() {
       setEvents(val(3, []));
       setNotes(val(4, []));
       setUsers(val(5, []));
-      setCatalog(val(6, []));
+      setCatalog(withBuiltinCatalog(val(6, [])));
     } finally {
       setLoading(false);
     }
@@ -610,6 +612,16 @@ function EditOpportunityModal({
         setSaving(false);
         return;
       }
+      if (!selected.length) {
+        alert("Select at least one product");
+        setSaving(false);
+        return;
+      }
+
+      const resolved = [];
+      for (const p of selected) {
+        resolved.push({ ...p, productId: await resolveCatalogProductId(p) });
+      }
 
       await updateOpportunity(opp.id, {
         title: form.title,
@@ -623,10 +635,10 @@ function EditOpportunityModal({
         tags: form.tags,
         owner: canOwner ? owner : opp.owner,
         coOwner: canCo ? coOwner : opp.coOwner,
-        solution: selected.map((p) => p.productName).join(", "),
+        solution: resolved.map((p) => p.productName).join(", "),
       });
 
-      await setOpportunityProducts(opp.id, selected);
+      await setOpportunityProducts(opp.id, resolved);
       await syncOpportunityTags(opp.tags, form.tags);
 
       if (canOwner && owner.id !== opp.owner?.id) {

@@ -8,7 +8,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { PIPELINE_STAGES, TERMINAL_STAGES, type OpportunityStage } from "@/lib/crm";
 import type { Opportunity } from "@/lib/firestore";
 import type { OpportunityProduct } from "@/lib/crm";
-import { PIPELINE_STAGE_LABELS, formatDate, byOpportunityTitle, countryFlag } from "@/lib/utils";
+import {
+  PIPELINE_STAGE_LABELS, formatDate, byOpportunityTitle, countryFlag,
+  getFollowUpStatus, followUpReason, RED_FLAG_EXPLANATION,
+} from "@/lib/utils";
 import ProductChips from "@/components/ProductChips";
 import { useNavigate } from "react-router-dom";
 
@@ -140,6 +143,7 @@ export function OppCard({
   const pocNeeded = products.filter((p) => p.requiresPoc);
   const pocDone = pocNeeded.filter((p) => p.pocStatus === "COMPLETED").length;
   const engagementTag = opp.tags[0];
+  const followUp = getFollowUpStatus(opp.lastActivityDate || null);
 
   return (
     <div
@@ -156,6 +160,11 @@ export function OppCard({
       </div>
       {opp.closeDate && (
         <p className="text-[11px] text-gray-500 mb-2">Close {formatDate(opp.closeDate)}</p>
+      )}
+      {(followUp === "RED_FLAG" || followUp === "WARNING") && (
+        <p className={`text-[11px] mb-2 ${followUp === "RED_FLAG" ? "text-red-700" : "text-amber-700"}`}>
+          {followUpReason(opp.lastActivityDate || null)} {RED_FLAG_EXPLANATION}
+        </p>
       )}
       <div className="flex flex-wrap gap-1 mb-2">
         <ProductChips products={products} solution={opp.solution} />

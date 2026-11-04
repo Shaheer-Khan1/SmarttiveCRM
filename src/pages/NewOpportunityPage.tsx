@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams, Link, Navigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getCustomers, getUsers, createOpportunity, type Customer, type UserProfile, type OpportunityStage } from "@/lib/firestore";
 import {
-  getCatalogProducts, setOpportunityProducts, syncOpportunityTags, logOpportunityEvent,
+  getCatalogProducts, ensureBuiltinCatalogProducts, withBuiltinCatalog, resolveCatalogProductId,
+  setOpportunityProducts, syncOpportunityTags, logOpportunityEvent,
   PIPELINE_STAGES, type CatalogProduct,
 } from "@/lib/crm";
 import { useAuth } from "@/context/AuthContext";
@@ -65,7 +66,9 @@ export default function NewOpportunityPage() {
         return { ...f, ownerId: defaultOwner };
       });
     });
-    getCatalogProducts({ activeOnly: true }).then(setCatalog);
+    ensureBuiltinCatalogProducts()
+      .then(() => getCatalogProducts({ activeOnly: true }))
+      .then((list) => setCatalog(withBuiltinCatalog(list.filter((p) => p.active))));
   }, []);
 
   const salesUsers = ownerEligibleUsers(users);
@@ -125,13 +128,17 @@ export default function NewOpportunityPage() {
       });
 
       if (form.products.length) {
-        await setOpportunityProducts(id, form.products.map((p) => ({
-          productId: p.productId,
-          productName: p.productName,
-          color: p.color,
-          requiresPoc: p.requiresPoc,
-          pocStatus: "NOT_STARTED" as const,
-        })));
+        const rows = [];
+        for (const p of form.products) {
+          rows.push({
+            productId: await resolveCatalogProductId(p),
+            productName: p.productName,
+            color: p.color,
+            requiresPoc: p.requiresPoc,
+            pocStatus: "NOT_STARTED" as const,
+          });
+        }
+        await setOpportunityProducts(id, rows);
       }
       await syncOpportunityTags([], form.tags);
       await logOpportunityEvent(id, {
