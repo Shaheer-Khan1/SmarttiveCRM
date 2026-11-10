@@ -31,7 +31,7 @@ import {
 } from "@/lib/utils";
 import {
   canEditOpportunity, canContributeToOpportunity, canChangeOwner, canChangeCoOwner,
-  canAddPocUpdate, canReopenCompletedPoc, canChangeStage, canCreateCrmRecords,
+  canAddPocUpdate, canReopenCompletedPoc, canChangeStage, canAdvanceOpportunity, canCreateCrmRecords,
   canDeleteRecord, ownerEligibleUsers, isAdmin as checkAdmin,
   FORWARD_STAGES, stageMoveKind, type StageMoveKind,
 } from "@/lib/permissions";
@@ -114,9 +114,9 @@ export default function OpportunityDetailPage() {
 
   const requestStageMove = (stage: OpportunityStage) => {
     if (!opp || !id) return;
-    const isOwner = opp.owner?.id === user?.uid;
-    if (!canChangeStage(opp.stage, stage, profile, isOwner)) {
-      alert("Only the owner can move this opportunity to the next stage. Only an admin can move a stage back.");
+    const canAdvance = canAdvanceOpportunity(opp, user?.uid);
+    if (!canChangeStage(opp.stage, stage, profile, canAdvance)) {
+      alert("Only the owner or co-owner can move this opportunity to the next stage. Only an admin can move a stage back.");
       return;
     }
     const kind = stageMoveKind(opp.stage, stage);
@@ -154,7 +154,7 @@ export default function OpportunityDetailPage() {
   if (!opp) return <div className="text-center py-20 text-gray-400">Opportunity not found</div>;
 
   const followUp = getFollowUpStatus(opp.lastActivityDate || null);
-  const isOwner = opp.owner?.id === user?.uid;
+  const canAdvance = canAdvanceOpportunity(opp, user?.uid);
   const pocNeeded = products.filter((p) => p.requiresPoc);
   const pocDone = pocNeeded.filter((p) => p.pocStatus === "COMPLETED").length;
   const stagedComments: Comment[] = comments.map((c) => ({
@@ -209,7 +209,7 @@ export default function OpportunityDetailPage() {
             const done = currentIdx >= 0 && idx < currentIdx;
             const isNext = currentIdx >= 0 && idx === currentIdx + 1;
             const isBack = opp.stage === "CLOSED_LOST" || (currentIdx >= 0 && idx < currentIdx);
-            const allowed = (isNext && isOwner) || (checkAdmin(profile) && isBack && !active);
+            const allowed = (isNext && canAdvance) || (checkAdmin(profile) && isBack && !active);
             return (
               <div key={s} className="flex items-center">
                 <button
@@ -217,8 +217,8 @@ export default function OpportunityDetailPage() {
                   disabled={!allowed}
                   onClick={() => requestStageMove(s)}
                   title={allowed
-                    ? (isNext ? "Owner: move one stage forward" : "Admin: move back")
-                    : isNext ? "Only the owner can move this to the next stage" : "Only the next stage is available"}
+                    ? (isNext ? "Owner or co-owner: move one stage forward" : "Admin: move back")
+                    : isNext ? "Only the owner or co-owner can move this to the next stage" : "Only the next stage is available"}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     active ? "bg-blue-600 text-white border-blue-600"
                       : done ? "bg-blue-50 text-blue-700 border-blue-200"
@@ -233,7 +233,7 @@ export default function OpportunityDetailPage() {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isOwner && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
+          {canAdvance && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
             <button
               type="button"
               onClick={() => requestStageMove("CLOSED_LOST")}
@@ -245,9 +245,9 @@ export default function OpportunityDetailPage() {
           {opp.stage === "CLOSED_LOST" && (
             <span className="text-xs font-medium text-red-700">Closed lost</span>
           )}
-          {!isOwner && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
+          {!canAdvance && opp.stage !== "CLOSED_WON" && opp.stage !== "CLOSED_LOST" && (
             <span className="text-xs text-slate-500">
-              Only the owner{opp.owner?.name ? `, ${opp.owner.name},` : ""} can move this to the next stage.
+              Only the owner or co-owner can move this to the next stage.
             </span>
           )}
           {opp.stageEnteredAt && (
@@ -709,7 +709,7 @@ function EditOpportunityModal({
           </div>
           <input value={form.partner} onChange={(e) => setForm((f) => ({ ...f, partner: e.target.value }))} className={inputCls} placeholder="Partner" />
           <p className="text-xs text-slate-500">
-            Stage is {PIPELINE_STAGE_LABELS[opp.stage]}. Only the owner can move it one step forward. Only an admin can move it back.
+            Stage is {PIPELINE_STAGE_LABELS[opp.stage]}. The owner or co-owner can move it one step forward. Only an admin can move it back.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <select disabled={!canOwner} value={form.ownerId} onChange={(e) => setForm((f) => ({ ...f, ownerId: e.target.value }))} className={inputCls + " bg-white disabled:opacity-60"}>

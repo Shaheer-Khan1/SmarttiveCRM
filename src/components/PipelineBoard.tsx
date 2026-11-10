@@ -55,7 +55,7 @@ export default function PipelineBoard({ opportunities, productsByOpp, canMove, o
     const opp = opportunities.find((o) => o.id === oppId);
     if (!opp || opp.stage === toStage) return;
     if (!canMove(opp, toStage)) {
-      window.alert("Only the owner can move an opportunity to the next stage. Only an admin can move a stage back.");
+      window.alert("Only the owner or co-owner can move an opportunity to the next stage. Only an admin can move a stage back.");
       return;
     }
     await onStageChange(oppId, toStage);

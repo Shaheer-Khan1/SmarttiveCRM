@@ -175,16 +175,16 @@ export function byOpportunityTitle<T extends { title: string }>(a: T, b: T): num
 }
 
 export const RED_FLAG_EXPLANATION =
-  "A red flag means no activity has been logged for 7 or more days. A warning means 5 or 6 days without a logged activity.";
+  "A red flag means nothing has been logged for 7 or more days — no comment, stage move, or other update. A warning means 5 or 6 days without one.";
 
 export function followUpReason(lastActivityDate: Date | null): string {
-  if (!lastActivityDate) return "No activity has been logged on this opportunity yet.";
+  if (!lastActivityDate) return "Nothing has been logged on this opportunity yet.";
   const days = differenceInDays(new Date(), lastActivityDate);
   const when = format(new Date(lastActivityDate), "MMM d, yyyy 'at' h:mm a");
-  if (days >= 7) return `No activity for ${days} days. Last activity was ${when}.`;
-  if (days >= 5) return `Last activity was ${days} days ago (${when}).`;
-  if (days <= 0) return `Last activity was ${when}.`;
-  return `Last activity was ${days} day${days === 1 ? "" : "s"} ago (${when}).`;
+  if (days >= 7) return `No update for ${days} days. Last update was ${when}.`;
+  if (days >= 5) return `Last update was ${days} days ago (${when}).`;
+  if (days <= 0) return `Last update was ${when}.`;
+  return `Last update was ${days} day${days === 1 ? "" : "s"} ago (${when}).`;
 }
 
 export const CATALOG_COLORS = [

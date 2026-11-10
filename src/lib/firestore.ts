@@ -127,6 +127,34 @@ function toDate(val: Timestamp | Date | null | undefined): Date {
   return val;
 }
 
+function asDate(val: unknown): Date | null {
+  if (!val) return null;
+  if (val instanceof Timestamp) return val.toDate();
+  if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
+  if (typeof val === "object" && "toDate" in val && typeof (val as { toDate: unknown }).toDate === "function") {
+    const d = (val as { toDate: () => Date }).toDate();
+    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  if (typeof val === "object" && "seconds" in val && typeof (val as { seconds: unknown }).seconds === "number") {
+    return new Date((val as { seconds: number }).seconds * 1000);
+  }
+  return null;
+}
+
+/** Move last-activity forward. Comments, stage moves, and other updates call this so a fresh touch clears a red flag. */
+export async function touchOpportunityActivity(opportunityId: string, at: Date = new Date()) {
+  if (Number.isNaN(at.getTime())) return;
+  const ref = doc(db, "opportunities", opportunityId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const current = asDate(snap.data()?.lastActivityDate);
+  if (current && current.getTime() >= at.getTime()) return;
+  await updateDoc(ref, {
+    lastActivityDate: Timestamp.fromDate(at),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 // ─── Users ───────────────────────────────────────────────────────────────────
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
@@ -447,11 +475,7 @@ export async function createActivity(data: {
     createdAt: serverTimestamp(),
   });
 
-  // Update opportunity's lastActivityDate
-  await updateDoc(doc(db, "opportunities", data.opportunityId), {
-    lastActivityDate: Timestamp.fromDate(data.date),
-    updatedAt: serverTimestamp(),
-  });
+  await touchOpportunityActivity(data.opportunityId, data.date);
 
   return ref.id;
 }
@@ -484,10 +508,43 @@ async function syncActivityEvents(
 }
 
 async function refreshLastActivity(opportunityId: string) {
-  const remaining = await getActivities(opportunityId);
-  const lastDate = remaining[0] ? Timestamp.fromDate(remaining[0].date) : null;
+  const dates: Date[] = [];
+  const activities = await getActivities(opportunityId);
+  if (activities[0]) dates.push(activities[0].date);
+
+  try {
+    const commentSnap = await getDocs(
+      query(
+        collection(db, "opportunities", opportunityId, "comments"),
+        orderBy("createdAt", "desc"),
+        limit(1),
+      ),
+    );
+    const commentAt = asDate(commentSnap.docs[0]?.data()?.createdAt);
+    if (commentAt) dates.push(commentAt);
+  } catch {
+    // Keep the activity date if the comments query cannot run.
+  }
+
+  try {
+    const eventSnap = await getDocs(collection(db, "opportunities", opportunityId, "events"));
+    eventSnap.docs.forEach((d) => {
+      if (d.data().type === "CREATED") return;
+      const eventAt = asDate(d.data().createdAt);
+      if (eventAt) dates.push(eventAt);
+    });
+  } catch {
+    // Keep the activity date if the events query cannot run.
+  }
+
+  const oppSnap = await getDoc(doc(db, "opportunities", opportunityId));
+  const stageAt = asDate(oppSnap.data()?.stageEnteredAt);
+  if (stageAt) dates.push(stageAt);
+
+  dates.sort((a, b) => b.getTime() - a.getTime());
+  const last = dates[0] ?? null;
   await updateDoc(doc(db, "opportunities", opportunityId), {
-    lastActivityDate: lastDate,
+    lastActivityDate: last ? Timestamp.fromDate(last) : null,
     updatedAt: serverTimestamp(),
   });
 }
@@ -546,11 +603,13 @@ export async function addComment(
   const ref = await addDoc(collection(db, "opportunities", opportunityId, "comments"), {
     text, authorId, authorName, stage, createdAt: serverTimestamp(),
   });
+  await touchOpportunityActivity(opportunityId, new Date());
   return ref.id;
 }
 
 export async function deleteComment(opportunityId: string, commentId: string): Promise<void> {
   await deleteDoc(doc(db, "opportunities", opportunityId, "comments", commentId));
+  await refreshLastActivity(opportunityId);
 }
 
 // ─── File Upload ──────────────────────────────────────────────────────────────

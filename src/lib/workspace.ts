@@ -2,11 +2,11 @@
  * Opportunity Workspace: stage gates + tasks for the Pulse / Tasks views.
  */
 import {
-  collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, where, Timestamp, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { AssignedPerson, Opportunity } from "./firestore";
+import { touchOpportunityActivity, type AssignedPerson, type Opportunity } from "./firestore";
 import { differenceInCalendarDays, format } from "date-fns";
 
 export type TaskLane = "Sales" | "Technical" | "Development";
@@ -61,6 +61,7 @@ export async function saveStageGates(opportunityId: string, gates: StageGate[]):
     stageGates: gates,
     updatedAt: serverTimestamp(),
   });
+  await touchOpportunityActivity(opportunityId, new Date());
 }
 
 function docToTask(snap: { id: string; data: () => Record<string, unknown> }): OpportunityTask {
@@ -118,6 +119,7 @@ export async function createOpportunityTask(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  await touchOpportunityActivity(data.opportunityId, new Date());
   return ref.id;
 }
 
@@ -129,7 +131,13 @@ export async function updateOpportunityTask(
   if (data.dueDate !== undefined) {
     payload.dueDate = data.dueDate ? Timestamp.fromDate(data.dueDate) : null;
   }
-  await updateDoc(doc(db, "opportunity_tasks", id), payload);
+  const ref = doc(db, "opportunity_tasks", id);
+  await updateDoc(ref, payload);
+  const snap = await getDoc(ref);
+  const opportunityId = snap.data()?.opportunityId;
+  if (typeof opportunityId === "string" && opportunityId) {
+    await touchOpportunityActivity(opportunityId, new Date());
+  }
 }
 
 export async function deleteOpportunityTask(id: string): Promise<void> {

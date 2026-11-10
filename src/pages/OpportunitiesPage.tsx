@@ -11,7 +11,7 @@ import FilterBar, { emptyFilters, opportunityMatchesFilters, type GlobalFilters 
 import PipelineBoard, { OppCard } from "@/components/PipelineBoard";
 import StageMoveDialog from "@/components/StageMoveDialog";
 import {
-  canChangeStage, canCreateCrmRecords, stageMoveKind,
+  canAdvanceOpportunity, canChangeStage, canCreateCrmRecords, stageMoveKind,
   type StageMoveKind,
 } from "@/lib/permissions";
 import { byOpportunityTitle, getFollowUpStatus, RED_FLAG_EXPLANATION } from "@/lib/utils";
@@ -69,8 +69,7 @@ export default function OpportunitiesPage() {
   }, [opps, filters, productsByOpp, followUpFilter]);
 
   const canMove = (opp: Opportunity, to: OpportunityStage) => {
-    const isOwner = !!user && opp.owner?.id === user.uid;
-    return canChangeStage(opp.stage, to, profile, isOwner);
+    return canChangeStage(opp.stage, to, profile, canAdvanceOpportunity(opp, user?.uid));
   };
 
   const onStageChange = async (oppId: string, stage: OpportunityStage) => {
@@ -91,8 +90,16 @@ export default function OpportunitiesPage() {
       actorId: user?.uid || "",
       actorName: profile?.name || "User",
     });
+    const touchedAt = new Date();
     setOpps((list) => list.map((o) => (
-      o.id === stageMove.opp.id ? { ...o, stage: stageMove.to, stageEnteredAt: movedAt } : o
+      o.id === stageMove.opp.id
+        ? {
+          ...o,
+          stage: stageMove.to,
+          stageEnteredAt: movedAt,
+          lastActivityDate: !o.lastActivityDate || o.lastActivityDate < touchedAt ? touchedAt : o.lastActivityDate,
+        }
+        : o
     )));
     setStageMove(null);
   };

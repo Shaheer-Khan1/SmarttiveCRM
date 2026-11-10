@@ -170,8 +170,16 @@ export function stageMoveKind(from: OpportunityStage, to: OpportunityStage): Sta
   return "blocked";
 }
 
+/** Owner or co-owner may move one stage forward or mark the opportunity lost. */
+export function canAdvanceOpportunity(
+  opp: Opportunity | null | undefined,
+  userId: string | undefined,
+): boolean {
+  return isOwner(opp, userId) || isCoOwner(opp, userId);
+}
+
 /**
- * One step forward, or marking lost, only by the opportunity owner.
+ * One step forward, or marking lost, by the owner or co-owner.
  * Any move backward, including leaving Closed Won / Closed Lost, is admin-only.
  * Skipping ahead is never allowed.
  */
@@ -179,11 +187,11 @@ export function canChangeStage(
   from: string,
   to: string,
   profile: UserProfile | null | undefined,
-  isOwner: boolean,
+  canAdvance: boolean,
 ): boolean {
   const kind = stageMoveKind(from as OpportunityStage, to as OpportunityStage);
   if (kind === "same") return true;
-  if (kind === "forward" || kind === "lost") return isOwner;
+  if (kind === "forward" || kind === "lost") return canAdvance;
   if (kind === "back") return isAdmin(profile);
   return false;
 }

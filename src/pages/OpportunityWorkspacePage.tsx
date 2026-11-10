@@ -26,7 +26,7 @@ import {
   getFollowUpStatus, followUpReason, RED_FLAG_EXPLANATION,
 } from "@/lib/utils";
 import {
-  canCreateCrmRecords, canEditOpportunity, isAdmin as checkAdmin,
+  canAdvanceOpportunity, canCreateCrmRecords, canEditOpportunity, isAdmin as checkAdmin,
   FORWARD_STAGES, nextOpportunityStage, stageMoveKind, type StageMoveKind,
 } from "@/lib/permissions";
 import StageMoveDialog from "@/components/StageMoveDialog";
@@ -231,7 +231,7 @@ export default function OpportunityWorkspacePage() {
   }, [tasks]);
 
   const canEdit = canEditOpportunity(selected, profile, user?.uid);
-  const isOwner = !!selected && selected.owner?.id === user?.uid;
+  const canAdvance = canAdvanceOpportunity(selected, user?.uid);
   const gates = parseStageGates(selected?.stageGates);
 
   const selectOpp = (id: string) => {
@@ -341,8 +341,16 @@ export default function OpportunityWorkspacePage() {
       actorId: user.uid,
       actorName: profile?.name || "User",
     });
+    const touchedAt = new Date();
     setOpps((list) => list.map((o) => (
-      o.id === selected.id ? { ...o, stage: stageMove.to, stageEnteredAt: movedAt } : o
+      o.id === selected.id
+        ? {
+          ...o,
+          stage: stageMove.to,
+          stageEnteredAt: movedAt,
+          lastActivityDate: !o.lastActivityDate || o.lastActivityDate < touchedAt ? touchedAt : o.lastActivityDate,
+        }
+        : o
     )));
     setStageMove(null);
     await loadDetail(selected.id);
@@ -464,7 +472,7 @@ export default function OpportunityWorkspacePage() {
                     const idx = FORWARD_STAGES.indexOf(s);
                     const isNext = stageIdx >= 0 && idx === stageIdx + 1;
                     const isBack = selected.stage === "CLOSED_LOST" || (stageIdx >= 0 && idx < stageIdx);
-                    const allowed = (isNext && isOwner) || (adminUser && isBack && s !== selected.stage);
+                    const allowed = (isNext && canAdvance) || (adminUser && isBack && s !== selected.stage);
                     const kind = stageMoveKind(selected.stage, s);
                     return (
                       <button
@@ -473,8 +481,8 @@ export default function OpportunityWorkspacePage() {
                         className={`step ${idx < stageIdx ? "done" : ""} ${idx === stageIdx ? "now" : ""}`}
                         disabled={!allowed}
                         title={allowed
-                          ? (kind === "forward" ? "Owner: move one stage forward" : "Admin: move back")
-                          : isNext ? "Only the owner can move this to the next stage" : "Only the next stage is available"}
+                          ? (kind === "forward" ? "Owner or co-owner: move one stage forward" : "Admin: move back")
+                          : isNext ? "Only the owner or co-owner can move this to the next stage" : "Only the next stage is available"}
                         onClick={() => {
                           if (!allowed || kind === "same" || kind === "blocked") return;
                           setStageMove({ to: s, kind });
@@ -485,13 +493,13 @@ export default function OpportunityWorkspacePage() {
                     );
                   })}
                 </div>
-                {!isOwner && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
+                {!canAdvance && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
                   <p className="text-xs text-slate-400">
-                    Only the owner{selected.owner?.name ? `, ${selected.owner.name},` : ""} can move this to the next stage.
+                    Only the owner or co-owner can move this to the next stage.
                   </p>
                 )}
                 <div className="ws-stage-actions">
-                  {nextStage && isOwner && (
+                  {nextStage && canAdvance && (
                     <button
                       type="button"
                       className="ws-solid"
@@ -500,7 +508,7 @@ export default function OpportunityWorkspacePage() {
                       Move to {PIPELINE_STAGE_LABELS[nextStage]}
                     </button>
                   )}
-                  {isOwner && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
+                  {canAdvance && selected.stage !== "CLOSED_WON" && selected.stage !== "CLOSED_LOST" && (
                     <button
                       type="button"
                       className="ws-ghost"

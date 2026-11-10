@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { format } from "date-fns";
 import { db } from "./firebase";
-import { updateOpportunity, type AssignedPerson } from "./firestore";
+import { touchOpportunityActivity, updateOpportunity, type AssignedPerson } from "./firestore";
 import { PIPELINE_STAGE_LABELS } from "./utils";
 
 function toDate(val: Timestamp | Date | null | undefined): Date {
@@ -422,6 +422,10 @@ export async function logOpportunityEvent(
     ...event,
     createdAt: serverTimestamp(),
   });
+  // Creating the record is not follow-up work. Everything after that is.
+  if (event.type !== "CREATED") {
+    await touchOpportunityActivity(opportunityId, new Date());
+  }
 }
 
 export function opportunityEventAt(event: Pick<OpportunityEvent, "createdAt" | "meta">): Date {
